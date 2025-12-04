@@ -1,0 +1,339 @@
+import type { Cell } from "../types/cell";
+import { createSheet } from "../grid/createSheet";
+
+class SpreadSheet extends HTMLElement {
+    rows = 40;
+    cols = 40;
+    ROWS = 0;
+    COLS = 0;
+    grid:Cell[][] = [];
+    selectedCell = { row: 0, col: 0 };
+    previousCell = {row: 0, col: 0};
+    currentCellCopy = this.selectedCell
+    initialWidth: number | undefined = 0;
+    currentWidth: number | undefined = 0;
+    activeCellElement:HTMLElement | null = null;
+    measureCanvas: HTMLCanvasElement = document.createElement('canvas');
+    measureCtx = this.measureCanvas.getContext("2d")!;
+    lineWidth: number = 0;
+    constructor() {
+       super();
+       this.grid = createSheet(this.rows, this.cols);
+       this.ROWS = this.grid.length;
+       this.COLS = this.grid[0].length;
+       this.tabIndex = 0;
+       this.focus();
+       this.addEventListener("keydown", this.handleKey.bind(this));
+       this.addEventListener("click", this.handleClick.bind(this));
+       this.addEventListener("dblclick", this.handleDoubleCLick);
+       this.addEventListener("input", this.handleInput);
+       this.addEventListener("mousemove", this.move);
+       console.log("init")
+    }
+    move(e: MouseEvent) {
+      //  console.log(e.clientX, e.clientY,"XXYYY")
+    }
+
+    handleDoubleCLick (event:MouseEvent):void {
+        this.setCellFocus(event);
+    }
+
+    handleKey(e: KeyboardEvent):void {
+      if(e.key === 'Enter' && e.ctrlKey) { 
+        this.setNextLine(e);
+        this.setNextLine(e);
+        return;
+      }
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(e.key)) {
+        e.preventDefault();
+        let {row, col} = this.selectedCell;
+        switch (e.key) {
+            case 'ArrowUp':
+               row = Math.max(0, row - 1);
+                break;
+            case 'ArrowDown':
+               row = Math.min(this.ROWS - 1, row + 1);
+               break;
+            case 'Enter':
+               const currentCell = this.querySelector(`td[data-r="${row}"][data-c="${col}"] div`) as HTMLElement;
+               if(currentCell.getAttribute('contentEditable') === 'false') {
+                   this.setCellFocusWhileEnterButon(currentCell);
+                   return;
+               }
+               row = Math.min(this.ROWS - 1, row + 1);
+                break;
+            case 'ArrowLeft':
+                col = Math.max(0, col - 1);
+                break;
+            case 'ArrowRight':
+            case 'Tab':
+                col = Math.min(this.COLS - 1, col + 1);
+                break;
+            default:
+                return;
+        }
+        this.setActiveCell(row, col);
+      }
+    };
+
+    setActiveCell(row: number, col: number):void {
+      console.log('actcell', row,col)
+      this.previousCell = {...this.selectedCell };
+      this.lineWidth = this.grid[row][col].lineWidth;
+      console.log(this.selectedCell,"selcell")
+      console.log(this.previousCell,"precell")
+      console.log(this.grid[row][col],"gridcell")
+       const previousCell = this.querySelector(`td[data-r="${this.previousCell.row}"][data-c="${this.previousCell.col}"] div`) as HTMLElement;
+       const cell = this.querySelector(`td[data-r="${row}"][data-c="${col}"] div`) as HTMLElement;
+       
+       if(!this.grid[row][col].cellActive) {
+          this.activeCellElement = cell as HTMLElement;
+          console.log(this.grid[this.previousCell.row][this.previousCell.col], "cell123")
+          console.log((previousCell.computedStyleMap().get("min-width") as CSSUnitValue).value,cell.getBoundingClientRect(),"precell")
+          console.log(this.grid,"setww")
+          const currentWidth = previousCell.getBoundingClientRect().width;
+          console.log(currentWidth,"currwidth")
+          this.grid[this.selectedCell.row][this.selectedCell.col].minWidth = currentWidth;
+       } else {
+          console.log(this.grid,"gridthis")
+       }
+       if(cell.innerHTML.length) {
+         this.grid[row][col].cellActive = true;
+         this.grid[row][col].value = cell.innerHTML;
+       }
+          
+      //  this.previousCell = {...this.selectedCell };
+       this.currentCellCopy = { ...this.selectedCell };
+       this.selectedCell = { row: row, col: col };
+       previousCell.classList.remove('input-cell', 'editable-cell');
+       previousCell.classList.add('normal-cell');
+       previousCell.style.position = "relative";
+       previousCell.style.removeProperty('min-width');
+       previousCell.style.left = "0px";
+       previousCell.style.top = "0px";
+       previousCell.style.width = "100px";
+       console.log(cell,"cells")
+       previousCell.setAttribute("contentEditable", "false");
+        if (cell && cell.classList.contains('normal-cell')) {
+          cell.classList.remove('normal-cell');
+          cell.classList.add('input-cell', 'editable-cell');
+        }
+      this.tabIndex = 0;
+      this.focus();  
+    }
+
+    handleClick(event: Event):void {
+      console.log(event, 'event');
+       const td = (event.target as HTMLElement).closest('td');
+       if(td?.children[0]?.nodeName !== 'DIV' && !td?.children[0]?.attributes.getNamedItem('contentEditable') ) return;
+       console.log(td.children,"child")
+       const row = Number(td.dataset.r);
+       const col = Number(td.dataset.c);
+       this.setActiveCell(row, col);
+    };
+
+    setCellFocus(event: MouseEvent):void {
+        const cell = event.target as HTMLElement;
+        console.log(cell.nodeName,'node name',cell.attributes.getNamedItem('contentEditable'))
+        if(!((cell.nodeName === 'DIV') && cell.attributes.getNamedItem('contentEditable'))) return;
+        console.log(cell,'span')
+        cell.setAttribute("contentEditable", "true");
+        cell.style.removeProperty('width');
+        // cell.classList.remove('normal-cell');
+        // cell.classList.add('input-cell', 'editable-cell');
+        cell.style.position = "fixed";
+        cell.style.left = `${cell.parentElement?.getBoundingClientRect().left! + 1}px`;
+        cell.style.top = `${cell.parentElement?.getBoundingClientRect().top! + 2}px`;
+        console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth, "cellrow",this.grid)
+        console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth,"inside width")
+        console.log(this.grid,"gridthis")
+        cell.style.minWidth = `${this.grid[this.selectedCell.row][this.selectedCell.col].minWidth}px`;
+        
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(cell);
+        range.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+    }
+
+    setCellFocusWhileEnterButon(cell: HTMLElement):void {
+        cell.children[0].setAttribute("contentEditable", "true");
+        cell.classList.remove('normal-cell');
+        cell.classList.add('input-cell', 'editable-cell');
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(cell);
+        range.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+    }
+
+    setNextLine(event: KeyboardEvent | Event):void {
+      event.preventDefault();
+      const selection = window.getSelection();
+      if(!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      const br = document.createElement('br');
+      range.insertNode(br);
+      range.setStartAfter(br);
+      range.setEndAfter(br);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+
+    handleInput(event: Event):void {
+      console.log(event)
+      const cell = event.target as HTMLDivElement;
+      const cellDimensions = cell.getBoundingClientRect();
+      const left = cellDimensions?.left;
+
+      const width = (this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement).getBoundingClientRect().width;
+      if(cell.innerText.length == 1) {
+        this.initialWidth = this.currentWidth = width;
+      }
+      const maxWidth = document.documentElement.clientWidth - left! + 17;
+      console.log(width, this.currentWidth,"wwcc")
+      cell.style.removeProperty('width');
+      if(this.grid[this.selectedCell.row][this.selectedCell.col].lengthFixed) {
+        this.setNextLineWhenLengthFixed(cell, event);
+      }
+      // console.log((this.querySelector(`td[data-r="${this.currentCellCopy.row}"][data-c="${this.currentCellCopy.col}"]`) as HTMLElement).CDATA_SECTION_NODE,"nextcell")
+      if(width! > this.currentWidth! && !this.grid[this.selectedCell.row][this.selectedCell.col].lengthFixed) {
+        this.currentCellCopy = { row: this.currentCellCopy.row, col: this.currentCellCopy.col + 1} ;
+      
+      const nextCell = this.querySelector(`td[data-r="${this.currentCellCopy.row}"][data-c="${this.currentCellCopy.col}"]`) as HTMLElement;
+      console.log(nextCell,"cellnext")
+
+        this.currentWidth! += nextCell!.getBoundingClientRect().width;
+        console.log(nextCell.getBoundingClientRect(),this.currentWidth,"nex")
+        if(nextCell.getBoundingClientRect().right > window.innerWidth) {
+          this.currentWidth! = window.innerWidth - nextCell.getBoundingClientRect().right - 16
+          console.log(maxWidth,"left")
+          cell.style.minWidth = `${maxWidth - 18}px`;
+          const availableWidth = this.getAvailableWidth(cell);
+          if(this.grid[this.selectedCell.row][this.selectedCell.col].lineWidth == 0) {
+            const fixedWidth = this.grid[this.selectedCell.row][this.selectedCell.col].lineWidth;
+            this.grid[this.selectedCell.row][this.selectedCell.col].lineWidth = this.lineWidth = availableWidth;
+          }
+
+          console.log(this.lineWidth,"availwidth")
+          this.setNextLineWhenLengthFixed(cell, event);
+          this.grid[this.selectedCell.row][this.selectedCell.col].lengthFixed = true;  
+          // });
+          // this.setNextLine(event);
+          return
+        };
+        // console.log(nextCell.getBoundingClientRect().right,"current w", cell.parentElement)
+        cell.parentElement!.style.position = "absolute";
+        cell.parentElement!.style.minWidth = `${this.currentWidth}px`;
+        cell.style.minWidth = `${this.currentWidth}px`;
+        console.log(cell,"fincel")
+        // const br = document.createElement('br');
+        // const textNode = document.createTextNode("");
+        // cell.append(br);
+        // cell.append(textNode);
+
+        // const range = document.createRange();
+        // range.setStart(textNode, 0);
+        // range.collapse(true);
+        // const selection = window.getSelection();
+        // selection?.removeAllRanges();
+        // selection?.addRange(range);
+      }
+      console.log(cell.parentElement,"cell")
+    }
+
+    getAvailableWidth(cell:HTMLDivElement): number {
+       const styles = getComputedStyle(cell);
+       const paddingLeft = parseFloat(styles.paddingLeft);
+       const paddingRight = parseFloat(styles.paddingRight);
+       const availableWidth = cell.clientWidth - paddingRight;
+       console.log(availableWidth,"awai",paddingLeft,paddingRight)
+       return availableWidth;
+    }
+
+    setNextLineWhenLengthFixed(cell: HTMLElement, event: Event):void {
+      const totalLines = cell.innerHTML.split('<br>');
+          console.log(totalLines,"tl")
+          const lineWidth = this.getLineWidth(cell.innerHTML.split('<br>')[0], "14px Arial");
+          // totalLines.forEach((value, index)=> {
+            const currentLineWidth = this.getLineWidth(cell.innerHTML.split('<br>')[totalLines.length - 1], "14px Arial");
+            console.log(lineWidth,cell.innerHTML.split('<br>'),"lineww")
+            console.log(currentLineWidth,lineWidth,"currli");
+            console.log(cell.innerHTML)
+            if(currentLineWidth >= lineWidth) {
+              console.log("hit")
+                this.setNextLine(event);
+                this.setNextLine(event);
+            }
+    }
+
+//   finishEditing() {
+//     console.log('finish')
+//       const cell = this.activeCellElement;
+//       console.log(cell, this.activeCellElement?.parentElement,'asl')
+//       if (!cell) return;
+//       const r = Number(cell.parentElement?.dataset.r);
+//       const c = Number(cell.parentElement?.dataset.c);
+//       console.log(r,c,'rc')
+
+//       const newValue = cell.innerText.trim();
+//       this.grid[r][c].value = newValue;
+//       this.grid[r][c].cellActive = false;
+//       this.renderer()
+//       cell.setAttribute("contentEditable", 'false');
+//       console.log(cell,'afl')
+//       this.activeCellElement?.setAttribute("contentEditable", 'false');
+//       cell.classList.remove("input-cell", "editable-cell");
+//       cell.classList.add("normal-cell");
+//       console.log(r,c,'bfrp')
+//       this.setActiveCell(r, c);
+// }
+
+getLineWidth(text: string, font: string) {
+   this.measureCtx!.font = font;
+   const width = this.measureCtx.measureText(text).width;
+   console.log(width,"widthline")
+   return width;
+}
+
+    connectedCallback() {
+       this.renderer();
+       this.setActiveCell(this.selectedCell.row, this.selectedCell.col);
+       console.log(this.grid,"grid")
+    };    
+
+    renderer() {
+        console.log("works2")
+         this.innerHTML = `
+         <div style="width:max-content;overflow-x:auto;">
+           <table class="table-sheet">
+              <thead>
+              <tr>
+              <th class="px-4 thead-padding"></th>
+              ${Array.from({length: this.cols}).map((_,hIndex)=> {
+                return `<th class="fw-light-2 fs-8">${String.fromCharCode(65 + hIndex)}</th>`
+              }).join("")}
+              </tr>
+              </thead>
+              <tbody>
+              ${this.grid.map((row, rIndex)=> {
+                return `<tr>
+                <td class="text-center fw-light-3 fs-8">${rIndex + 1}</td>
+                ${row.map((col, cIndex)=> {
+                return `<td style="width: 100px;position: relative; box-sizing: border-box;" data-r="${rIndex}" data-c="${cIndex}">
+                <div style="position: relative; white-space: pre-wrap;" class="normal-cell" role="cell-parent" contentEditable = false>${col.value}</div>
+                </td>`
+                }).join("")}
+                </tr>`
+              }).join("")}
+              </tbody>
+           </table>
+           </div>        
+        ` ;
+    }
+}
+
+customElements.define('spread-sheet', SpreadSheet);
