@@ -80,12 +80,9 @@ class SpreadSheet extends HTMLElement {
       console.log('actcell', row,col)
       this.previousCell = {...this.selectedCell };
       this.lineWidth = this.grid[row][col].lineWidth;
-      console.log(this.selectedCell,"selcell")
-      console.log(this.previousCell,"precell")
-      console.log(this.grid[row][col],"gridcell")
-       const previousCell = this.querySelector(`td[data-r="${this.previousCell.row}"][data-c="${this.previousCell.col}"] div`) as HTMLElement;
-       const cell = this.querySelector(`td[data-r="${row}"][data-c="${col}"] div`) as HTMLElement;
-       
+       const previousCell = this.querySelector(`td[data-r="${this.previousCell.row}"][data-c="${this.previousCell.col}"]`) as HTMLElement;
+       const cell = this.querySelector(`td[data-r="${row}"][data-c="${col}"]`) as HTMLElement;
+       console.log(cell, previousCell,"pc")
        if(!this.grid[row][col].cellActive) {
           this.activeCellElement = cell as HTMLElement;
           console.log(this.grid[this.previousCell.row][this.previousCell.col], "cell123")
@@ -97,7 +94,7 @@ class SpreadSheet extends HTMLElement {
        } else {
           console.log(this.grid,"gridthis")
        }
-       if(cell.innerHTML.length) {
+       if(cell.children[0].innerHTML.length) {
          this.grid[row][col].cellActive = true;
          this.grid[row][col].value = cell.innerHTML;
        }
@@ -109,14 +106,15 @@ class SpreadSheet extends HTMLElement {
        previousCell.classList.add('normal-cell');
        previousCell.style.position = "relative";
        previousCell.style.removeProperty('min-width');
-       previousCell.style.left = "0px";
-       previousCell.style.top = "0px";
-       previousCell.style.width = "100px";
+      //  (previousCell.children[0] as HTMLElement).style.left = "0px";
+      //  (previousCell.children[0] as HTMLElement).style.top = "0px";
+      //  (previousCell.children[0] as HTMLElement).style.width = "100px";
        console.log(cell,"cells")
-       previousCell.setAttribute("contentEditable", "false");
+       previousCell.children[0].setAttribute("contentEditable", "false");
         if (cell && cell.classList.contains('normal-cell')) {
           cell.classList.remove('normal-cell');
           cell.classList.add('input-cell', 'editable-cell');
+          
         }
       this.tabIndex = 0;
       this.focus();  
@@ -136,18 +134,17 @@ class SpreadSheet extends HTMLElement {
         const cell = event.target as HTMLElement;
         console.log(cell.nodeName,'node name',cell.attributes.getNamedItem('contentEditable'))
         if(!((cell.nodeName === 'DIV') && cell.attributes.getNamedItem('contentEditable'))) return;
-        console.log(cell,'span')
         cell.setAttribute("contentEditable", "true");
         cell.style.removeProperty('width');
         // cell.classList.remove('normal-cell');
         // cell.classList.add('input-cell', 'editable-cell');
-        cell.style.position = "fixed";
-        cell.style.left = `${cell.parentElement?.getBoundingClientRect().left! + 1}px`;
+        // cell.style.position = "fixed";
+        cell.style.left = `${cell.parentElement?.getBoundingClientRect().left!}px`;
         cell.style.top = `${cell.parentElement?.getBoundingClientRect().top! + 2}px`;
         console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth, "cellrow",this.grid)
         console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth,"inside width")
         console.log(this.grid,"gridthis")
-        cell.style.minWidth = `${this.grid[this.selectedCell.row][this.selectedCell.col].minWidth}px`;
+        // cell.style.minWidth = `${this.grid[this.selectedCell.row][this.selectedCell.col].minWidth}px`;
         
         const range = document.createRange();
         const sel = window.getSelection();
@@ -189,47 +186,45 @@ class SpreadSheet extends HTMLElement {
       const cellDimensions = cell.getBoundingClientRect();
       const left = cellDimensions?.left;
 
-      const width = (this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement).getBoundingClientRect().width;
+      const width = cell.getBoundingClientRect().width;
       if(cell.innerText.length == 1) {
         this.initialWidth = this.currentWidth = width;
       }
       const maxWidth = document.documentElement.clientWidth - left! + 17;
-      console.log(width, this.currentWidth,"wwcc")
       cell.style.removeProperty('width');
       if(this.grid[this.selectedCell.row][this.selectedCell.col].lengthFixed) {
         this.setNextLineWhenLengthFixed(cell, event);
       }
+      console.log(width, this.currentWidth,"currentwidth")
       // console.log((this.querySelector(`td[data-r="${this.currentCellCopy.row}"][data-c="${this.currentCellCopy.col}"]`) as HTMLElement).CDATA_SECTION_NODE,"nextcell")
       if(width! > this.currentWidth! && !this.grid[this.selectedCell.row][this.selectedCell.col].lengthFixed) {
         this.currentCellCopy = { row: this.currentCellCopy.row, col: this.currentCellCopy.col + 1} ;
       
       const nextCell = this.querySelector(`td[data-r="${this.currentCellCopy.row}"][data-c="${this.currentCellCopy.col}"]`) as HTMLElement;
-      console.log(nextCell,"cellnext")
 
         this.currentWidth! += nextCell!.getBoundingClientRect().width;
-        console.log(nextCell.getBoundingClientRect(),this.currentWidth,"nex")
         if(nextCell.getBoundingClientRect().right > window.innerWidth) {
           this.currentWidth! = window.innerWidth - nextCell.getBoundingClientRect().right - 16
-          console.log(maxWidth,"left")
           cell.style.minWidth = `${maxWidth - 18}px`;
           const availableWidth = this.getAvailableWidth(cell);
           if(this.grid[this.selectedCell.row][this.selectedCell.col].lineWidth == 0) {
             const fixedWidth = this.grid[this.selectedCell.row][this.selectedCell.col].lineWidth;
             this.grid[this.selectedCell.row][this.selectedCell.col].lineWidth = this.lineWidth = availableWidth;
           }
-
-          console.log(this.lineWidth,"availwidth")
           this.setNextLineWhenLengthFixed(cell, event);
           this.grid[this.selectedCell.row][this.selectedCell.col].lengthFixed = true;  
-          // });
-          // this.setNextLine(event);
           return
         };
         // console.log(nextCell.getBoundingClientRect().right,"current w", cell.parentElement)
+        // nextCell.style.position = "absolute";
+        // nextCell.style.backgroundColor = "blue";
         cell.parentElement!.style.position = "absolute";
-        cell.parentElement!.style.minWidth = `${this.currentWidth}px`;
+        cell.parentElement!.style.height = "fit-content"
+        // cell.style.backgroundColor = "green"
         cell.style.minWidth = `${this.currentWidth}px`;
-        console.log(cell,"fincel")
+        cell.parentElement!.style.flex = "1";
+        // cell.style.minWidth = `${this.currentWidth}px`;
+        cell.style.flex = "1"
         // const br = document.createElement('br');
         // const textNode = document.createTextNode("");
         // cell.append(br);
@@ -242,7 +237,6 @@ class SpreadSheet extends HTMLElement {
         // selection?.removeAllRanges();
         // selection?.addRange(range);
       }
-      console.log(cell.parentElement,"cell")
     }
 
     getAvailableWidth(cell:HTMLDivElement): number {
@@ -250,7 +244,6 @@ class SpreadSheet extends HTMLElement {
        const paddingLeft = parseFloat(styles.paddingLeft);
        const paddingRight = parseFloat(styles.paddingRight);
        const availableWidth = cell.clientWidth - paddingRight;
-       console.log(availableWidth,"awai",paddingLeft,paddingRight)
        return availableWidth;
     }
 
@@ -264,10 +257,10 @@ class SpreadSheet extends HTMLElement {
             console.log(currentLineWidth,lineWidth,"currli");
             console.log(cell.innerHTML)
             if(currentLineWidth >= lineWidth) {
-              console.log("hit")
+                console.log("hit")
                 this.setNextLine(event);
                 this.setNextLine(event);
-            }
+            }               
     }
 
 //   finishEditing() {
@@ -314,7 +307,7 @@ getLineWidth(text: string, font: string) {
               <tr>
               <th class="px-4 thead-padding"></th>
               ${Array.from({length: this.cols}).map((_,hIndex)=> {
-                return `<th class="fw-light-2 fs-8">${String.fromCharCode(65 + hIndex)}</th>`
+                return `<th style="width: 100px;" class="fw-light-2 fs-8">${String.fromCharCode(65 + hIndex)}</th>`
               }).join("")}
               </tr>
               </thead>
@@ -323,8 +316,8 @@ getLineWidth(text: string, font: string) {
                 return `<tr>
                 <td class="text-center fw-light-3 fs-8">${rIndex + 1}</td>
                 ${row.map((col, cIndex)=> {
-                return `<td style="width: 100px;position: relative; box-sizing: border-box;" data-r="${rIndex}" data-c="${cIndex}">
-                <div style="position: relative; white-space: pre-wrap;" class="normal-cell" role="cell-parent" contentEditable = false>${col.value}</div>
+                return `<td class="normal-cell" style="white-space: nowrap;position: relative; box-sizing: border-box;" data-r="${rIndex}" data-c="${cIndex}">
+                <div style="width:100px;white-space: pre-wrap;" class="edit-cell" role="cell-parent" contentEditable = false>${col.value}</div>
                 </td>`
                 }).join("")}
                 </tr>`
