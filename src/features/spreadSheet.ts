@@ -1,5 +1,7 @@
 import type { Cell } from "../types/cell";
 import { createSheet } from "../grid/createSheet";
+import { UndoRedo } from "../features/utilities/undoRedocontrols";
+import type { CellChange } from "../types/cellchange";
 
 class SpreadSheet extends HTMLElement {
     rows = 40;
@@ -16,6 +18,8 @@ class SpreadSheet extends HTMLElement {
     measureCanvas: HTMLCanvasElement = document.createElement('canvas');
     measureCtx = this.measureCanvas.getContext("2d")!;
     lineWidth: number = 0;
+    startTyping: boolean = false;
+    private undoRedo = new UndoRedo();
     constructor() {
        super();
        this.grid = createSheet(this.rows, this.cols);
@@ -43,6 +47,25 @@ class SpreadSheet extends HTMLElement {
         this.setNextLine(e);
         this.setNextLine(e);
         return;
+      }
+      if(e.ctrlKey && e.key === 'z') {
+        e.preventDefault();
+        if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
+        let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
+        if(currentCell){
+          let undoValue: CellChange | undefined = this.undoRedo.undo({row: this.selectedCell.row, col: this.selectedCell.col});
+          currentCell.innerText = undoValue?.oldValue ?? "";
+        };
+      }
+      if(e.ctrlKey && e.key === 'y') {
+        e.preventDefault();
+        if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
+        let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
+        if(currentCell){
+          let redoValue: CellChange | undefined = this.undoRedo.redo({row: this.selectedCell.row, col: this.selectedCell.col});
+          console.log(redoValue,"redovalue");
+          currentCell.innerText = redoValue?.newValue ?? "";
+        };
       }
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(e.key)) {
         e.preventDefault();
@@ -106,6 +129,7 @@ class SpreadSheet extends HTMLElement {
        previousCell.classList.add('normal-cell');
        previousCell.style.position = "relative";
        previousCell.style.removeProperty('min-width');
+       this.undoRedo.clearUndoStack();
       //  (previousCell.children[0] as HTMLElement).style.left = "0px";
       //  (previousCell.children[0] as HTMLElement).style.top = "0px";
       //  (previousCell.children[0] as HTMLElement).style.width = "100px";
@@ -136,6 +160,8 @@ class SpreadSheet extends HTMLElement {
         if(!((cell.nodeName === 'DIV') && cell.attributes.getNamedItem('contentEditable'))) return;
         cell.setAttribute("contentEditable", "true");
         cell.style.removeProperty('width');
+        this.startTyping = false;
+        
         // cell.classList.remove('normal-cell');
         // cell.classList.add('input-cell', 'editable-cell');
         // cell.style.position = "fixed";
@@ -145,7 +171,7 @@ class SpreadSheet extends HTMLElement {
         console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth,"inside width")
         console.log(this.grid,"gridthis")
         // cell.style.minWidth = `${this.grid[this.selectedCell.row][this.selectedCell.col].minWidth}px`;
-        
+        this.grid[this.selectedCell.row][this.selectedCell.col].oldValue = this.grid[this.selectedCell.row][this.selectedCell.col].newValue = cell.innerText;
         const range = document.createRange();
         const sel = window.getSelection();
         range.selectNodeContents(cell);
@@ -181,11 +207,26 @@ class SpreadSheet extends HTMLElement {
     }
 
     handleInput(event: Event):void {
-      console.log(event)
       const cell = event.target as HTMLDivElement;
       const cellDimensions = cell.getBoundingClientRect();
       const left = cellDimensions?.left;
-
+      const getTime = new Date();
+      let startTypingTime;
+      if(!this.startTyping) {
+        this.startTyping = true;
+        startTypingTime = getTime.getMilliseconds();
+        this.grid[this.selectedCell.row][this.selectedCell.col].startTypingAt = startTypingTime;
+      };
+      this.grid[this.selectedCell.row][this.selectedCell.col].oldValue = this.grid[this.selectedCell.row][this.selectedCell.col].newValue;
+      console.log(this.grid[this.selectedCell.row][this.selectedCell.col].newValue,this.grid[this.selectedCell.row][this.selectedCell.col].oldValue,"no")
+      const currentTime = new Date();
+      setTimeout(()=>{
+       if(startTypingTime! - currentTime.getMilliseconds() <= 2000) {
+         this.grid[this.selectedCell.row][this.selectedCell.col].newValue = cell.innerText;
+         this.saveEdit();
+         this.startTyping = false;
+      }
+      },2000);
       const width = cell.getBoundingClientRect().width;
       if(cell.innerText.length == 1) {
         this.initialWidth = this.currentWidth = width;
@@ -257,10 +298,13 @@ class SpreadSheet extends HTMLElement {
             console.log(currentLineWidth,lineWidth,"currli");
             console.log(cell.innerHTML)
             if(currentLineWidth >= lineWidth) {
-                console.log("hit")
                 this.setNextLine(event);
                 this.setNextLine(event);
             }               
+    }
+
+    saveEdit() {
+      this.undoRedo.saveEdit({row: this.selectedCell.row, col: this.selectedCell.col, oldValue: this.grid[this.selectedCell.row][this.selectedCell.col].oldValue, newValue: this.grid[this.selectedCell.row][this.selectedCell.col].newValue});
     }
 
 //   finishEditing() {
@@ -317,7 +361,7 @@ getLineWidth(text: string, font: string) {
                 <td class="text-center fw-light-3 fs-8">${rIndex + 1}</td>
                 ${row.map((col, cIndex)=> {
                 return `<td class="normal-cell" style="white-space: nowrap;position: relative; box-sizing: border-box;" data-r="${rIndex}" data-c="${cIndex}">
-                <div style="width:100px;white-space: pre-wrap;" class="edit-cell" role="cell-parent" contentEditable = false>${col.value}</div>
+                <div style="width:100px;white-space: pre-wrap;" class="edit-cell" role="cell-parent" contentEditable = false>${col.newValue}</div>
                 </td>`
                 }).join("")}
                 </tr>`
