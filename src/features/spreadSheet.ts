@@ -3,7 +3,7 @@ import { createSheet } from "../grid/createSheet";
 import { UndoRedo } from "../features/utilities/undoRedocontrols";
 import type { CellChange } from "../types/cellchange";
 
-class SpreadSheet extends HTMLElement {
+export class SpreadSheet extends HTMLElement {
     rows = 40;
     cols = 40;
     ROWS = 0;
@@ -19,7 +19,8 @@ class SpreadSheet extends HTMLElement {
     measureCtx = this.measureCanvas.getContext("2d")!;
     lineWidth: number = 0;
     startTyping: boolean = false;
-    private undoRedo = new UndoRedo();
+    sheet = document.querySelector('spread-sheet') as SpreadSheet;
+    private undoRedo = new UndoRedo(this.sheet);
     constructor() {
        super();
        this.grid = createSheet(this.rows, this.cols);
@@ -42,6 +43,28 @@ class SpreadSheet extends HTMLElement {
         this.setCellFocus(event);
     }
 
+    callUndo():void {
+      console.log("call")
+      if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
+      // this.undoRedo.undo({row: this.selectedCell.row, col: this.selectedCell.col});
+      let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
+        if(currentCell){
+          let undoValue: CellChange | undefined = this.undoRedo.undo({row: this.selectedCell.row, col: this.selectedCell.col});
+          console.log(undoValue,"undo value")
+          currentCell.innerText = undoValue?.oldValue ?? "";
+        };
+    }
+
+    callRedo():void {
+      if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
+        let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
+        if(currentCell){
+          let redoValue: CellChange | undefined = this.undoRedo.redo({row: this.selectedCell.row, col: this.selectedCell.col});
+          console.log(redoValue,"redovalue");
+          if(redoValue) currentCell.innerText = redoValue?.newValue ?? "";
+        };
+    }
+
     handleKey(e: KeyboardEvent):void {
       if(e.key === 'Enter' && e.ctrlKey) { 
         this.setNextLine(e);
@@ -50,22 +73,24 @@ class SpreadSheet extends HTMLElement {
       }
       if(e.ctrlKey && e.key === 'z') {
         e.preventDefault();
-        if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
-        let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
-        if(currentCell){
-          let undoValue: CellChange | undefined = this.undoRedo.undo({row: this.selectedCell.row, col: this.selectedCell.col});
-          currentCell.innerText = undoValue?.oldValue ?? "";
-        };
+        this.callUndo();
+        // if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
+        // let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
+        // if(currentCell){
+        //   let undoValue: CellChange | undefined = this.undoRedo.undo({row: this.selectedCell.row, col: this.selectedCell.col});
+        //   currentCell.innerText = undoValue?.oldValue ?? "";
+        // };
       }
       if(e.ctrlKey && e.key === 'y') {
         e.preventDefault();
-        if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
-        let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
-        if(currentCell){
-          let redoValue: CellChange | undefined = this.undoRedo.redo({row: this.selectedCell.row, col: this.selectedCell.col});
-          console.log(redoValue,"redovalue");
-          currentCell.innerText = redoValue?.newValue ?? "";
-        };
+        this.callRedo();
+        // if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
+        // let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
+        // if(currentCell){
+        //   let redoValue: CellChange | undefined = this.undoRedo.redo({row: this.selectedCell.row, col: this.selectedCell.col});
+        //   console.log(redoValue,"redovalue");
+        //   if(redoValue) currentCell.innerText = redoValue?.newValue ?? "";
+        // };
       }
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(e.key)) {
         e.preventDefault();
@@ -130,6 +155,7 @@ class SpreadSheet extends HTMLElement {
        previousCell.style.position = "relative";
        previousCell.style.removeProperty('min-width');
        this.undoRedo.clearUndoStack();
+       this.undoRedo.setCurrentCell(this.selectedCell);
       //  (previousCell.children[0] as HTMLElement).style.left = "0px";
       //  (previousCell.children[0] as HTMLElement).style.top = "0px";
       //  (previousCell.children[0] as HTMLElement).style.width = "100px";
@@ -361,7 +387,7 @@ getLineWidth(text: string, font: string) {
                 <td class="text-center fw-light-3 fs-8">${rIndex + 1}</td>
                 ${row.map((col, cIndex)=> {
                 return `<td class="normal-cell" style="white-space: nowrap;position: relative; box-sizing: border-box;" data-r="${rIndex}" data-c="${cIndex}">
-                <div style="width:100px;white-space: pre-wrap;" class="edit-cell" role="cell-parent" contentEditable = false>${col.newValue}</div>
+                <div style="width:100px;white-space: pre-wrap;" class="edit-cell" role="cell-parent" contentEditable = false>${col.value}</div>
                 </td>`
                 }).join("")}
                 </tr>`
