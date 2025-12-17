@@ -18,12 +18,10 @@ export class UndoRedo extends HTMLElement {
       }
 
       connectedCallback() {
+             console.log("undoredo")
          this.renderer();
       }
 
-      setCurrentCell(currentCell: CellChange) {
-      this.currentCell = currentCell;
-      }
       callUndo (){
          this.spreadSheet.callUndo();
       }
@@ -35,14 +33,6 @@ export class UndoRedo extends HTMLElement {
         console.log(currentValue,"cvalue")
         this.undoStack.push(currentValue)
         console.log(this.undoStack,"undostack")
-      }
-
-      renderer() {
-            this.innerHTML = `
-             <button id="undo"><i class="fa-solid fa-rotate-left"></i></button>
-             &nbsp;
-             <button id="redo"><i class="fa-solid fa-rotate-right"></i></button>
-            `;
       }
 
       undo(currentCell: CellChange): CellChange | undefined {
@@ -90,6 +80,14 @@ export class UndoRedo extends HTMLElement {
       clearUndoStack() {
             this.undoStack = [];
             this.undoCount = 1;
+      }
+
+      renderer() {
+            this.innerHTML = `
+             <button id="undo"><i class="fa-solid fa-rotate-left"></i></button>
+             &nbsp;
+             <button id="redo"><i class="fa-solid fa-rotate-right"></i></button>
+            `;
       }
 }
 

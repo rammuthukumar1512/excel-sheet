@@ -9,4 +9,9 @@ export interface Cell {
   lineWidth: number;
   lengthFixed: boolean; 
   startTypingAt: number;
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  color: string;
+  underline: boolean;
 }

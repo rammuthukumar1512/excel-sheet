@@ -5,7 +5,7 @@ export class UtilityComponent extends HTMLElement {
     constructor() {
         super();
     }
-    async connectedCallback() {
+    connectedCallback() {
        this.innerHTML = `
        ${utilitycomponent}`;
     }

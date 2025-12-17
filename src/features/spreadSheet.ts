@@ -2,16 +2,18 @@ import type { Cell } from "../types/cell";
 import { createSheet } from "../grid/createSheet";
 import { UndoRedo } from "../features/utilities/undoRedocontrols";
 import type { CellChange } from "../types/cellchange";
+import { FontFamily } from "./utilities/fontFamily";
+import { CommonControls } from "./utilities/commonControls";
 
 export class SpreadSheet extends HTMLElement {
     rows = 40;
     cols = 40;
     ROWS = 0;
     COLS = 0;
-    grid:Cell[][] = [];
+    grid:Cell[][] = createSheet(this.rows, this.cols);
     selectedCell = { row: 0, col: 0 };
     previousCell = {row: 0, col: 0};
-    currentCellCopy = this.selectedCell
+    currentCellCopy = this.selectedCell;
     initialWidth: number | undefined = 0;
     currentWidth: number | undefined = 0;
     activeCellElement:HTMLElement | null = null;
@@ -21,9 +23,10 @@ export class SpreadSheet extends HTMLElement {
     startTyping: boolean = false;
     sheet = document.querySelector('spread-sheet') as SpreadSheet;
     private undoRedo = new UndoRedo(this.sheet);
+    private commonControls = new CommonControls();
+    private fontFamily = new FontFamily(this.sheet);
     constructor() {
        super();
-       this.grid = createSheet(this.rows, this.cols);
        this.ROWS = this.grid.length;
        this.COLS = this.grid[0].length;
        this.tabIndex = 0;
@@ -62,7 +65,19 @@ export class SpreadSheet extends HTMLElement {
           let redoValue: CellChange | undefined = this.undoRedo.redo({row: this.selectedCell.row, col: this.selectedCell.col});
           console.log(redoValue,"redovalue");
           if(redoValue) currentCell.innerText = redoValue?.newValue ?? "";
-        };
+      };
+    }
+
+    setFontFamily(font: string) {
+        
+    }
+
+    updateGrid():void {
+      
+    }
+ 
+    virtualCellRendering(selectedRow: CellChange): void {
+      const virtualCell: HTMLElement | null = this.querySelector(`td[data-r=${selectedRow.row}][data-c="${selectedRow.col}"] div`);
     }
 
     handleKey(e: KeyboardEvent):void {
@@ -155,7 +170,7 @@ export class SpreadSheet extends HTMLElement {
        previousCell.style.position = "relative";
        previousCell.style.removeProperty('min-width');
        this.undoRedo.clearUndoStack();
-       this.undoRedo.setCurrentCell(this.selectedCell);
+       this.commonControls.setCurrentCell(this.selectedCell);
       //  (previousCell.children[0] as HTMLElement).style.left = "0px";
       //  (previousCell.children[0] as HTMLElement).style.top = "0px";
       //  (previousCell.children[0] as HTMLElement).style.width = "100px";
