@@ -4,6 +4,8 @@ import { UndoRedo } from "../features/utilities/undoRedocontrols";
 import type { CellChange } from "../types/cellchange";
 import { FontFamily } from "./utilities/fontFamily";
 import { CommonControls } from "./utilities/commonControls";
+import { FontWeight } from "./utilities/fontWeight";
+import { FontItalic } from "./utilities/fontItalic";
 
 export class SpreadSheet extends HTMLElement {
     rows = 40;
@@ -24,7 +26,10 @@ export class SpreadSheet extends HTMLElement {
     sheet = document.querySelector('spread-sheet') as SpreadSheet;
     private undoRedo = new UndoRedo(this.sheet);
     private commonControls = new CommonControls();
-    private fontFamily = new FontFamily(this.sheet);
+    private fontFamily = new FontFamily();
+    private fontWeight = new FontWeight();
+    private fontItalic = new FontItalic();
+    private fontStyle = 'normal';
     constructor() {
        super();
        this.ROWS = this.grid.length;
@@ -36,11 +41,18 @@ export class SpreadSheet extends HTMLElement {
        this.addEventListener("dblclick", this.handleDoubleCLick);
        this.addEventListener("input", this.handleInput);
        this.addEventListener("mousemove", this.move);
-       console.log("init")
     }
     move(e: MouseEvent) {
       //  console.log(e.clientX, e.clientY,"XXYYY")
     }
+
+    connectedCallback() {
+       this.renderer();
+       this.setActiveCell(this.selectedCell.row, this.selectedCell.col);
+       setTimeout(()=>{
+         const cells = document.querySelectorAll(".cell");
+       },0);
+    };    
 
     handleDoubleCLick (event:MouseEvent):void {
         this.setCellFocus(event);
@@ -63,13 +75,208 @@ export class SpreadSheet extends HTMLElement {
         let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
         if(currentCell){
           let redoValue: CellChange | undefined = this.undoRedo.redo({row: this.selectedCell.row, col: this.selectedCell.col});
-          console.log(redoValue,"redovalue");
           if(redoValue) currentCell.innerText = redoValue?.newValue ?? "";
       };
     }
 
-    setFontFamily(font: string) {
+    setFontFamily(font: string):void {
+        const selection = window.getSelection();
+        if(!selection || selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+        const node = range.commonAncestorContainer;
+        const text = range.toString();
+        const element = node as HTMLElement;
+          if(element?.nodeName === 'SPAN') {
+            element.style.fontFamily = font;
+            range.insertNode(element);
+            return;
+          }
+        const span = document.createElement('span');
+        span.style.fontFamily = font;
+        const fragment = range.extractContents();
+        span.textContent = text;
+        range.insertNode(span);
+    }
+
+    removeWrapperFromSelection(selector:any) {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return;
+
+      const range = selection.getRangeAt(0);
+
+      let startNode = range.startContainer;
+
+      if (startNode && startNode.nodeType === 3) {
+        startNode = startNode.parentNode as Element;
+      }
+      let wrapper;
+      if(startNode instanceof Element) {
+      wrapper = startNode.closest(selector);
+      if (!wrapper) return;
+      }
+
+      const beforeRange = range.cloneRange();
+      beforeRange.selectNodeContents(wrapper);
+      console.log(range.startOffset,"sta");
+      beforeRange.setEnd(range.startContainer, range.startOffset);
+
+      const afterRange = range.cloneRange();
+      afterRange.selectNodeContents(wrapper);
+      afterRange.setStart(range.endContainer, range.endOffset);
+
+      const beforeFragment = beforeRange.extractContents();
+      const selectedFragment = range.extractContents();
+      const afterFragment = afterRange.extractContents();
+
+      if (beforeFragment.textContent.trim()) {
+        const beforeSpan = wrapper.cloneNode(false);
+        beforeSpan.appendChild(beforeFragment);
+        wrapper.parentNode.insertBefore(beforeSpan, wrapper);
+      }
+
+      wrapper.parentNode.insertBefore(selectedFragment, wrapper);
+
+      if (afterFragment.textContent.trim()) {
+        const afterSpan = wrapper.cloneNode(false);
+        afterSpan.appendChild(afterFragment);
+        wrapper.parentNode.insertBefore(afterSpan, wrapper);
+      }
+
+      wrapper.remove();
+    }
+
+    setFontItalic():void {
+        const selection = document.getSelection();
+        if(!selection || selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+        console.log(range.commonAncestorContainer.nodeName,"r")
+        const childElements = range.commonAncestorContainer.childNodes;
+        const childSpanElements: ChildNode[] = Array.from(childElements).filter( (el): el is HTMLSpanElement => el instanceof HTMLSpanElement); 
+        const childTextElements:any = Array.from(childElements).findIndex((el,index): el is HTMLTextAreaElement=> el.nodeName === '#text');
         
+        if(range.startContainer.nextSibling?.nodeName === 'SPAN' || range.startContainer.parentElement?.nodeName === 'SPAN') {
+           if(range.commonAncestorContainer.nodeName === 'SPAN') {
+              const spanParentEl = range.commonAncestorContainer as HTMLSpanElement;
+              if(spanParentEl && spanParentEl.computedStyleMap().get("font-style")?.toString() === 'italic') { 
+              spanParentEl.style.fontStyle = "normal";
+              } else {
+                spanParentEl.style.fontStyle = "italic";
+              }
+              if(childSpanElements.length) {
+                childSpanElements.forEach((el)=> {
+                  (el as HTMLSpanElement).style.fontStyle = spanParentEl.style.fontStyle;
+                });
+                childElements.forEach((el)=> {
+                  (el as HTMLTextAreaElement).style.fontStyle = spanParentEl.style.fontStyle;
+                });
+              } 
+            } else if(range.commonAncestorContainer.nodeName === 'DIV' && childSpanElements.length) {
+                  range.commonAncestorContainer.childNodes.forEach((el, index)=> {
+                    childTextElements.forEach((value:any, _:Number)=> {
+                        if(value === index) {
+                           
+                        }
+                    })
+                  let span:any = document.createElement('span');
+                  span.innerText = el.nodeValue;
+                  
+                });
+            }
+           else if(range.startContainer.parentElement?.nodeName === 'SPAN') {
+            const span = range.startContainer.parentElement as HTMLElement;
+            if(span && span.computedStyleMap().get("font-style")?.toString() === 'italic') {
+              span.style.fontStyle = "normal";
+            } else {
+              span.style.fontStyle = "italic";
+              console.log(span)
+            }
+          }
+             else {
+                const spanEl = range.startContainer.parentElement as HTMLElement;
+                if(spanEl && spanEl.nodeName === 'SPAN' && spanEl.computedStyleMap().get("font-style")?.toString() === 'italic') {
+                spanEl.style.fontStyle = "normal";
+              } else if(spanEl && spanEl.nodeName === 'SPAN' && spanEl.computedStyleMap().get("font-style")?.toString() === 'normal'){
+                spanEl.style.fontStyle = "italic";
+                console.log(spanEl,'ll')
+              } else if(childSpanElements.length) {
+                childSpanElements.forEach((el)=> {
+                  (el as HTMLSpanElement).style.fontStyle = 'italic';
+                });
+                let span = document.createElement('span');
+                    span.style.fontStyle = "italic";
+                    const text = range.extractContents();
+                    span.appendChild(text);
+                    range.deleteContents();
+                    range.insertNode(span);
+                    selection.removeAllRanges();
+                    const newRange = document.createRange();
+                    newRange.selectNodeContents(span);
+                    selection.addRange(newRange);
+                console.log(childSpanElements,"ch")
+              } 
+        
+              else {
+               let span = document.createElement('span');
+               span.style.fontStyle = "italic";
+               const text = range.extractContents();
+               span.appendChild(text);
+               range.deleteContents();
+               range.insertNode(span);
+               selection.removeAllRanges();
+               const newRange = document.createRange();
+               newRange.selectNodeContents(span);
+               selection.addRange(newRange);
+              }
+            }
+           } 
+          //  else if((range.commonAncestorContainer as HTMLElement).tagName === 'SPAN') {
+          //      let spanEl = range.commonAncestorContainer.parentElement as HTMLSpanElement;
+          //      if(spanEl && spanEl.computedStyleMap().get("font-style")?.toString() === 'italic') {
+          //       spanEl.style.fontStyle = 'normal';
+          //      } else if(spanEl && spanEl.computedStyleMap().get("font-style")?.toString() === 'normal'){
+          //       spanEl.style.fontStyle = 'italic';
+          //      }
+          //  } 
+           else {
+               let span = document.createElement('span');
+               span.style.fontStyle = "italic";
+               const text = range.toString();
+               span.textContent = text;
+               range.deleteContents();
+               range.insertNode(span);
+               selection.removeAllRanges();
+               const newRange = document.createRange();
+               newRange.selectNodeContents(span);
+               selection.addRange(newRange);
+            }
+    }
+
+    setFontWeight() {
+        const selection = document.getSelection();
+        if(!selection || selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+        if(range.startContainer.nextSibling?.nodeName === 'SPAN') {
+           const span = range.startContainer.nextSibling as HTMLElement;
+           console.log(span.computedStyleMap().get("font-weight")?.toString(),"span")
+            if(span && Number(span.computedStyleMap().get("font-weight")?.toString()) === 700) {
+              span.style.fontWeight = "normal";
+              console.log(span,"here")
+              // range.insertNode(span);
+            } else {
+              span.style.fontWeight = "bold";
+              console.log(span)
+              // range.insertNode(span);
+            }
+           } else {
+               let span = document.createElement('span');
+               span.style.fontWeight = "bold";
+               const text = range.toString();
+               span.textContent = text;
+               range.deleteContents();
+               range.insertNode(span);
+               selection.removeAllRanges();
+               selection.addRange(range);
+            }
     }
 
     updateGrid():void {
@@ -145,17 +352,16 @@ export class SpreadSheet extends HTMLElement {
       this.lineWidth = this.grid[row][col].lineWidth;
        const previousCell = this.querySelector(`td[data-r="${this.previousCell.row}"][data-c="${this.previousCell.col}"]`) as HTMLElement;
        const cell = this.querySelector(`td[data-r="${row}"][data-c="${col}"]`) as HTMLElement;
-       console.log(cell, previousCell,"pc")
        if(!this.grid[row][col].cellActive) {
           this.activeCellElement = cell as HTMLElement;
           console.log(this.grid[this.previousCell.row][this.previousCell.col], "cell123")
           console.log((previousCell.computedStyleMap().get("min-width") as CSSUnitValue).value,cell.getBoundingClientRect(),"precell")
           console.log(this.grid,"setww")
           const currentWidth = previousCell.getBoundingClientRect().width;
-          console.log(currentWidth,"currwidth")
+          
           this.grid[this.selectedCell.row][this.selectedCell.col].minWidth = currentWidth;
        } else {
-          console.log(this.grid,"gridthis")
+          
        }
        if(cell.children[0].innerHTML.length) {
          this.grid[row][col].cellActive = true;
@@ -174,7 +380,7 @@ export class SpreadSheet extends HTMLElement {
       //  (previousCell.children[0] as HTMLElement).style.left = "0px";
       //  (previousCell.children[0] as HTMLElement).style.top = "0px";
       //  (previousCell.children[0] as HTMLElement).style.width = "100px";
-       console.log(cell,"cells")
+      
        previousCell.children[0].setAttribute("contentEditable", "false");
         if (cell && cell.classList.contains('normal-cell')) {
           cell.classList.remove('normal-cell');
@@ -189,7 +395,7 @@ export class SpreadSheet extends HTMLElement {
       console.log(event, 'event');
        const td = (event.target as HTMLElement).closest('td');
        if(td?.children[0]?.nodeName !== 'DIV' && !td?.children[0]?.attributes.getNamedItem('contentEditable') ) return;
-       console.log(td.children,"child")
+       
        const row = Number(td.dataset.r);
        const col = Number(td.dataset.c);
        this.setActiveCell(row, col);
@@ -197,7 +403,7 @@ export class SpreadSheet extends HTMLElement {
 
     setCellFocus(event: MouseEvent):void {
         const cell = event.target as HTMLElement;
-        console.log(cell.nodeName,'node name',cell.attributes.getNamedItem('contentEditable'))
+        console.log(cell.parentElement?.localName,'node name',cell.attributes.getNamedItem('contentEditable'))
         if(!((cell.nodeName === 'DIV') && cell.attributes.getNamedItem('contentEditable'))) return;
         cell.setAttribute("contentEditable", "true");
         cell.style.removeProperty('width');
@@ -208,9 +414,9 @@ export class SpreadSheet extends HTMLElement {
         // cell.style.position = "fixed";
         cell.style.left = `${cell.parentElement?.getBoundingClientRect().left!}px`;
         cell.style.top = `${cell.parentElement?.getBoundingClientRect().top! + 2}px`;
-        console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth, "cellrow",this.grid)
-        console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth,"inside width")
-        console.log(this.grid,"gridthis")
+        // console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth, "cellrow",this.grid)
+        // console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth,"inside width")
+        // console.log(this.grid,"gridthis")
         // cell.style.minWidth = `${this.grid[this.selectedCell.row][this.selectedCell.col].minWidth}px`;
         this.grid[this.selectedCell.row][this.selectedCell.col].oldValue = this.grid[this.selectedCell.row][this.selectedCell.col].newValue = cell.innerText;
         const range = document.createRange();
@@ -277,7 +483,7 @@ export class SpreadSheet extends HTMLElement {
       if(this.grid[this.selectedCell.row][this.selectedCell.col].lengthFixed) {
         this.setNextLineWhenLengthFixed(cell, event);
       }
-      console.log(width, this.currentWidth,"currentwidth")
+      
       // console.log((this.querySelector(`td[data-r="${this.currentCellCopy.row}"][data-c="${this.currentCellCopy.col}"]`) as HTMLElement).CDATA_SECTION_NODE,"nextcell")
       if(width! > this.currentWidth! && !this.grid[this.selectedCell.row][this.selectedCell.col].lengthFixed) {
         this.currentCellCopy = { row: this.currentCellCopy.row, col: this.currentCellCopy.col + 1} ;
@@ -335,9 +541,9 @@ export class SpreadSheet extends HTMLElement {
           const lineWidth = this.getLineWidth(cell.innerHTML.split('<br>')[0], "14px Arial");
           // totalLines.forEach((value, index)=> {
             const currentLineWidth = this.getLineWidth(cell.innerHTML.split('<br>')[totalLines.length - 1], "14px Arial");
-            console.log(lineWidth,cell.innerHTML.split('<br>'),"lineww")
-            console.log(currentLineWidth,lineWidth,"currli");
-            console.log(cell.innerHTML)
+            // console.log(lineWidth,cell.innerHTML.split('<br>'),"lineww")
+            // console.log(currentLineWidth,lineWidth,"currli");
+            // console.log(cell.innerHTML)
             if(currentLineWidth >= lineWidth) {
                 this.setNextLine(event);
                 this.setNextLine(event);
@@ -377,12 +583,6 @@ getLineWidth(text: string, font: string) {
    return width;
 }
 
-    connectedCallback() {
-       this.renderer();
-       this.setActiveCell(this.selectedCell.row, this.selectedCell.col);
-       console.log(this.grid,"grid")
-    };    
-
     renderer() {
         console.log("works2")
          this.innerHTML = `
@@ -401,8 +601,8 @@ getLineWidth(text: string, font: string) {
                 return `<tr>
                 <td class="text-center fw-light-3 fs-8">${rIndex + 1}</td>
                 ${row.map((col, cIndex)=> {
-                return `<td class="normal-cell" style="white-space: nowrap;position: relative; box-sizing: border-box;" data-r="${rIndex}" data-c="${cIndex}">
-                <div style="width:100px;white-space: pre-wrap;" class="edit-cell" role="cell-parent" contentEditable = false>${col.value}</div>
+                return `<td class="normal-cell cell" style="white-space: nowrap;position: relative; box-sizing: border-box;" data-r="${rIndex}" data-c="${cIndex}">
+                <div style="width:100px;white-space: pre-wrap;font-family: ${col.fontFamily};font-size:${col.fontSize};font-weight:${col.bold};" class="edit-cell" role="cell-parent" contentEditable = false>${col.value}</div>
                 </td>`
                 }).join("")}
                 </tr>`
