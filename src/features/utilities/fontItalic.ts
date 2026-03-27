@@ -10,7 +10,8 @@ export class FontItalic extends HTMLElement {
            this.renderer();
             const select = this.querySelector("#bold") as HTMLSpanElement;
             select?.addEventListener("click", ()=>{
-               this.spreadSheet.setFontItalic();
+              //  this.spreadSheet.setFontItalic();
+              this.spreadSheet.applyStyleToSelection("font-style", "italic");
             });
             setTimeout(()=>{
               this.spreadSheet = new SpreadSheet();

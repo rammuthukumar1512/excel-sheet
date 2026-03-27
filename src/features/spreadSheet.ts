@@ -1,4 +1,4 @@
-import type { Cell } from "../types/cell";
+import type { Cell, Editor } from "../types/cell";
 import { createSheet } from "../grid/createSheet";
 import { UndoRedo } from "../features/utilities/undoRedocontrols";
 import type { CellChange } from "../types/cellchange";
@@ -98,6 +98,115 @@ export class SpreadSheet extends HTMLElement {
         range.insertNode(span);
     }
 
+    applyStyleToSelection(styleKey: string, styleValue: string) {
+      let textAndStyles:any = [];
+      const selRange = this.getSelectionRange();
+      console.log(selRange,"srt")
+      if(!selRange) return;
+      const root = document.getElementById("table-sheet");
+      const editor = root?.querySelector(
+          `td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`
+      );
+
+      if (!editor) {
+        console.error("Editor not found", this.selectedCell);
+        return null;
+      }
+      const editorText = editor.innerHTML.toString();
+      textAndStyles = [{text: editorText, styles: "", selRange: [0, editor.innerHTML.length], startOffset: 0, endOffset: editorText.length}];
+      let completeEditor: Editor = this.grid[this.selectedCell.row][this.selectedCell.col].editor;
+
+      let initialRange = 0;
+      let endRange = selRange.start;
+
+      if(completeEditor.length == 1) {
+         completeEditor[0] = {text:editorText.substring(initialRange, endRange), style: {styleKey: styleValue}, startOffset: 0, endOffset: selRange.start};
+         completeEditor.push({text:editorText.substring(selRange.start, selRange.end), style: {styleKey: styleValue}, startOffset: selRange.start, endOffset: selRange.end});
+         editorText.substring(selRange.end).length ? completeEditor.push({text:editorText.substring(selRange.end), style: {styleKey: styleValue}, startOffset: selRange.end, endOffset: editorText.length}) : "";
+         this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
+         console.log(completeEditor,"fe")
+         return;
+      } 
+      if(completeEditor.length > 1) {
+         if(completeEditor[completeEditor.length - 1].endOffset < editorText.length){
+            completeEditor[completeEditor.length] = {text:editorText.substring(completeEditor[completeEditor.length - 1].endOffset, editorText.length), style: {styleKey: styleValue}, startOffset: completeEditor[completeEditor.length - 1].endOffset, endOffset: editorText.length};
+         };
+         let tempEditor = completeEditor;
+         tempEditor.forEach((modal: any, index: number)=>{
+             if(modal.startOffset === selRange.start && modal.endOffset === selRange.end) {
+              
+               Object.keys(modal.style).forEach((key)=>{
+                  if(modal.style[key] === styleValue) return;
+                  else { modal.style[key] = styleValue; return; }
+              });
+             };
+             console.log(modal,'modal')
+             if(selRange.start > modal.startOffset && selRange.end < modal.endOffset) {
+                  console.log("hiiit")
+                  let newModal = {text: editorText.substring(modal.startOffset, selRange.start),style: {...modal.style},startOffset: modal.startOffset, endOffset: selRange.start};
+                  completeEditor[index] = newModal;
+                  completeEditor.splice(index + 1, 0, {text:editorText.substring(selRange.start, selRange.end), style: {styleKey: styleValue}, startOffset: selRange.start, endOffset: selRange.end});
+                  completeEditor.splice(index + 2, 0, {text:editorText.substring(selRange.end, modal.endOffset), style: {styleKey: styleValue}, startOffset: selRange.end, endOffset: modal.endOffset});
+                  this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
+                  console.log(completeEditor,"ab")
+                  return;
+             }
+             if(selRange.start == modal.startOffset && selRange.end < modal.endOffset) {
+                  console.log(selRange, "slr")
+                  let newModal = {text: editorText.substring(selRange.start, selRange.end),style: {...modal.style},startOffset: selRange.start, endOffset: selRange.end};
+                  completeEditor[index] = newModal;
+                  completeEditor.splice(index + 1, 0, {text:editorText.substring(selRange.end, modal.endOffset), style: {styleKey: styleValue}, startOffset: selRange.end , endOffset: modal.endOffset});
+                  this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
+                  console.log(completeEditor,"ab1");
+                  return;
+             }
+             if(selRange.start > modal.startOffset && selRange.end == modal.endOffset) {
+                  console.log(selRange,modal, index, "slr")
+                  let newModal = {text: editorText.substring(modal.startOffset, selRange.start),style: {...modal.style},startOffset: modal.startOffset, endOffset: selRange.start};
+                  completeEditor[index] = newModal;
+                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),style: {...modal.style},startOffset: selRange.start, endOffset: selRange.end});
+                  this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
+                  console.log(completeEditor,"ab1");
+                  return;
+             }
+
+             if(selRange.start < modal.endOffset && modal.startOffset > selRange.start) {
+                  let newModal = {text: modal.text.substring(modal.startOffset, selRange.start),style: {...modal.style},startOffset: modal.startOffset, endOffset: selRange.start};
+                  completeEditor[index] = newModal;
+             }
+         });
+      }
+      
+    }
+
+    getSelectionRange() {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return null;
+
+        const range = selection.getRangeAt(0);
+        const root = document.getElementById("table-sheet");
+        const editor = root?.querySelector(
+          `td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`
+        );
+
+        if (!editor) {
+          console.error("Editor not found", this.selectedCell);
+          return null;
+        }
+
+        const preStart = range.cloneRange();
+        preStart.selectNodeContents(editor);
+        preStart.setEnd(range.startContainer, range.startOffset);
+        const start = preStart.toString().length;
+
+        const preEnd = range.cloneRange();
+        preEnd.selectNodeContents(editor);
+        preEnd.setEnd(range.endContainer, range.endOffset);
+        const end = preEnd.toString().length;
+
+        return { start, end };
+    }
+
     removeWrapperFromSelection(selector:any) {
       const selection = window.getSelection();
       if (!selection?.rangeCount) return;
@@ -149,7 +258,8 @@ export class SpreadSheet extends HTMLElement {
         const selection = document.getSelection();
         if(!selection || selection.rangeCount === 0) return;
         const range = selection.getRangeAt(0);
-        console.log(range.commonAncestorContainer.nodeName,"r")
+        console.log(range,"r")
+        console.log(this.getSelectionRange(),'selr');
         const childElements = range.commonAncestorContainer.childNodes;
         const childSpanElements: ChildNode[] = Array.from(childElements).filter( (el): el is HTMLSpanElement => el instanceof HTMLSpanElement); 
         const childTextElements:any = Array.from(childElements).findIndex((el,index): el is HTMLTextAreaElement=> el.nodeName === '#text');
@@ -161,6 +271,7 @@ export class SpreadSheet extends HTMLElement {
               spanParentEl.style.fontStyle = "normal";
               } else {
                 spanParentEl.style.fontStyle = "italic";
+              
               }
               if(childSpanElements.length) {
                 childSpanElements.forEach((el)=> {
@@ -170,18 +281,7 @@ export class SpreadSheet extends HTMLElement {
                   (el as HTMLTextAreaElement).style.fontStyle = spanParentEl.style.fontStyle;
                 });
               } 
-            } else if(range.commonAncestorContainer.nodeName === 'DIV' && childSpanElements.length) {
-                  range.commonAncestorContainer.childNodes.forEach((el, index)=> {
-                    childTextElements.forEach((value:any, _:Number)=> {
-                        if(value === index) {
-                           
-                        }
-                    })
-                  let span:any = document.createElement('span');
-                  span.innerText = el.nodeValue;
-                  
-                });
-            }
+            } 
            else if(range.startContainer.parentElement?.nodeName === 'SPAN') {
             const span = range.startContainer.parentElement as HTMLElement;
             if(span && span.computedStyleMap().get("font-style")?.toString() === 'italic') {
@@ -190,6 +290,11 @@ export class SpreadSheet extends HTMLElement {
               span.style.fontStyle = "italic";
               console.log(span)
             }
+            if(childSpanElements.length) {
+                childSpanElements.forEach((el)=> {
+                  (el as HTMLSpanElement).style.fontStyle = 'italic';
+                });
+              }
           }
              else {
                 const spanEl = range.startContainer.parentElement as HTMLElement;
@@ -587,7 +692,7 @@ getLineWidth(text: string, font: string) {
         console.log("works2")
          this.innerHTML = `
          <div style="width:max-content;overflow-x:auto;">
-           <table class="table-sheet">
+           <table id="table-sheet" class="table-sheet">
               <thead>
               <tr>
               <th class="px-4 thead-padding"></th>
