@@ -24,7 +24,6 @@ export class FontFamily extends HTMLElement {
         setTimeout(()=>{
           const spreadSheet = new SpreadSheet;
           this.spreadSheet = spreadSheet;
-          console.log(this.spreadSheet,"spreadsheet1")
         //   clearTimeout(timerId);
         },500);
         

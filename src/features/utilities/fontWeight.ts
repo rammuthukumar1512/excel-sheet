@@ -16,7 +16,6 @@ fontFamilies = ["Arial", "Roboto", "Times New Roman"];
         });
         setTimeout(()=>{
           this.spreadSheet = new SpreadSheet();
-          console.log(this.spreadSheet,"spreadsheet1")
           //   clearTimeout(timerId);
         },500);
         

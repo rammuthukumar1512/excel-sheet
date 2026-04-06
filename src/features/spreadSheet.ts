@@ -15,7 +15,7 @@ export class SpreadSheet extends HTMLElement {
     grid:Cell[][] = createSheet(this.rows, this.cols);
     selectedCell = { row: 0, col: 0 };
     previousCell = {row: 0, col: 0};
-    currentCellCopy = this.selectedCell;
+    currentCellCopy = structuredClone(this.selectedCell);
     initialWidth: number | undefined = 0;
     currentWidth: number | undefined = 0;
     activeCellElement:HTMLElement | null = null;
@@ -30,22 +30,22 @@ export class SpreadSheet extends HTMLElement {
     private fontWeight = new FontWeight();
     private fontItalic = new FontItalic();
     private fontStyle = 'normal';
+    static instance: SpreadSheet;
     constructor() {
        super();
+       SpreadSheet.instance = this;
        this.ROWS = this.grid.length;
        this.COLS = this.grid[0].length;
        this.tabIndex = 0;
        this.focus();
        this.addEventListener("keydown", this.handleKey.bind(this));
        this.addEventListener("click", this.handleClick.bind(this));
-       this.addEventListener("dblclick", this.handleDoubleCLick);
+       this.addEventListener("dblclick", this.handleDoubleCLick.bind(this));
        this.addEventListener("input", this.handleInput);
-       this.addEventListener("mousemove", this.move);
+       
+      //  this.addEventListener("mousemove", this.move);
     }
-    move(e: MouseEvent) {
-      //  console.log(e.clientX, e.clientY,"XXYYY")
-    }
-
+    
     connectedCallback() {
        this.renderer();
        this.setActiveCell(this.selectedCell.row, this.selectedCell.col);
@@ -55,17 +55,16 @@ export class SpreadSheet extends HTMLElement {
     };    
 
     handleDoubleCLick (event:MouseEvent):void {
+      console.log(this.grid)
         this.setCellFocus(event);
     }
 
     callUndo():void {
-      console.log("call")
       if(this.grid[this.selectedCell.row][this.selectedCell.col].oldValue === this.grid[this.selectedCell.row][this.selectedCell.col].newValue) return;
       // this.undoRedo.undo({row: this.selectedCell.row, col: this.selectedCell.col});
       let currentCell = this.querySelector(`td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`) as HTMLElement;
         if(currentCell){
           let undoValue: CellChange | undefined = this.undoRedo.undo({row: this.selectedCell.row, col: this.selectedCell.col});
-          console.log(undoValue,"undo value")
           currentCell.innerText = undoValue?.oldValue ?? "";
         };
     }
@@ -98,8 +97,9 @@ export class SpreadSheet extends HTMLElement {
         range.insertNode(span);
     }
 
-    applyStyleToSelection(styleKey: string, styleValue: string) {
+    applyStyleToSelection(styleKey: string, styleValue: string):void {
       let textAndStyles:any = [];
+      console.log(this.selectedCell,this.grid,"sleddf")
       const selRange = this.getSelectionRange();
       console.log(selRange,"srt")
       if(!selRange) return;
@@ -108,9 +108,11 @@ export class SpreadSheet extends HTMLElement {
           `td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`
       );
 
+      console.log(editor,this.selectedCell,this.previousCell,this.commonControls.getCurrentCell(), "editor")
+
       if (!editor) {
         console.error("Editor not found", this.selectedCell);
-        return null;
+        return;
       }
       const editorText = editor.innerHTML.toString();
       textAndStyles = [{text: editorText, styles: "", selRange: [0, editor.innerHTML.length], startOffset: 0, endOffset: editorText.length}];
@@ -173,6 +175,13 @@ export class SpreadSheet extends HTMLElement {
                   newEditor.forEach((modal: any, lastModalIndex: number) => {
                     if(isStyleApplied) return;
                     console.log(modal,"nemmm")
+                    if(modal.startOffset === selRange.start) {
+                      console.log(lastModalIndex, "lstind",completeEditor[lastModalIndex + 1]);
+                      if(selRange.end !== completeEditor[lastModalIndex + 1]?.endOffset) completeEditor.splice(lastModalIndex + 1, 1, {text:editorText.substring(selRange.end, completeEditor[lastModalIndex + 1]?.endOffset), style: {styleKey: styleValue}, startOffset: selRange.end , endOffset: completeEditor[lastModalIndex + 1]?.endOffset});
+                      console.log(completeEditor,"comb6")
+                      isStyleApplied = true;
+                      return;
+                    };
                     if(modal.endOffset === selRange.end) {
                       console.log(lastModalIndex, "lstind");
                       completeEditor.splice(index + 1, lastModalIndex - 1);
@@ -182,6 +191,7 @@ export class SpreadSheet extends HTMLElement {
                       return;
                     };
                     if(modal.endOffset > selRange.end && modal.startOffset > selRange.end) {
+                        console.log(modal, "modall")
                         let newModal = { text: editorText.substring(selRange.end, modal.endOffset),style: {...modal.style},startOffset: selRange.end, endOffset: modal.endOffset };
                         completeEditor.splice(index + 1, lastModalIndex - 1, newModal);
                         console.log(completeEditor,"comb2")
@@ -208,31 +218,14 @@ export class SpreadSheet extends HTMLElement {
                   let newModal = {text: editorText.substring(modal.startOffset, selRange.start),style: {...modal.style},startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
                   let newEditor = structuredClone(tempEditor);
-                  newEditor.forEach((modal: any, lastModalIndex: number) => {
-                    if(isStyleApplied) return;
-                    console.log(modal,"nemmm")
-                    if(modal.endOffset === selRange.end) {
-                      console.log(lastModalIndex, "lstind");
-                      completeEditor.splice(index + 1, lastModalIndex - 1);
-                      this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
-                      console.log(completeEditor,"comb3");
-                      isStyleApplied = true;
-                      return;
-                    };
-                    if(modal.endOffset > selRange.end && modal.startOffset > selRange.end) {
-                        let newModal = { text: editorText.substring(selRange.end, modal.endOffset),style: {...modal.style},startOffset: selRange.end, endOffset: modal.endOffset };
-                        completeEditor.splice(index + 1, lastModalIndex - 1, newModal);
-                        console.log(completeEditor,"comb4")
-                        isStyleApplied = true;
-                        return;
-                    }
-                  });
-                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),style: {...modal.style},startOffset: selRange.start, endOffset: selRange.end});
-                  selRange.end !== completeEditor[index + 2].endOffset ? completeEditor.splice(index + 2, 1, {text: editorText.substring(selRange.end, completeEditor[index + 2].endOffset),style: {...modal.style},startOffset: selRange.end, endOffset: completeEditor[index + 2].endOffset}) : completeEditor.splice(index + 2, 1);
+                  if(!isStyleApplied) {
+                  completeEditor.splice(index + 1, 1, {text: editorText.substring(selRange.start, selRange.end),style: {...modal.style},startOffset: selRange.start, endOffset: selRange.end});
+                  if(selRange.end !== completeEditor[index + 2]?.endOffset) completeEditor.splice(index + 2, 1, {text:editorText.substring(selRange.end, completeEditor[index + 2]?.endOffset), style: {styleKey: styleValue}, startOffset: selRange.end , endOffset: completeEditor[index + 2]?.endOffset});
                   this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                   isStyleApplied = true;
                   console.log(completeEditor,"ab2");
                   return;
+                  }
              }
          });
       }
@@ -248,6 +241,8 @@ export class SpreadSheet extends HTMLElement {
         const editor = root?.querySelector(
           `td[data-r="${this.selectedCell.row}"][data-c="${this.selectedCell.col}"] div`
         );
+
+        console.log(this.selectedCell,"scle")
 
         if (!editor) {
           console.error("Editor not found", this.selectedCell);
@@ -286,7 +281,6 @@ export class SpreadSheet extends HTMLElement {
 
       const beforeRange = range.cloneRange();
       beforeRange.selectNodeContents(wrapper);
-      console.log(range.startOffset,"sta");
       beforeRange.setEnd(range.startContainer, range.startOffset);
 
       const afterRange = range.cloneRange();
@@ -318,8 +312,6 @@ export class SpreadSheet extends HTMLElement {
         const selection = document.getSelection();
         if(!selection || selection.rangeCount === 0) return;
         const range = selection.getRangeAt(0);
-        console.log(range,"r")
-        console.log(this.getSelectionRange(),'selr');
         const childElements = range.commonAncestorContainer.childNodes;
         const childSpanElements: ChildNode[] = Array.from(childElements).filter( (el): el is HTMLSpanElement => el instanceof HTMLSpanElement); 
         const childTextElements:any = Array.from(childElements).findIndex((el,index): el is HTMLTextAreaElement=> el.nodeName === '#text');
@@ -512,16 +504,12 @@ export class SpreadSheet extends HTMLElement {
     };
 
     setActiveCell(row: number, col: number):void {
-      console.log('actcell', row,col)
       this.previousCell = {...this.selectedCell };
       this.lineWidth = this.grid[row][col].lineWidth;
        const previousCell = this.querySelector(`td[data-r="${this.previousCell.row}"][data-c="${this.previousCell.col}"]`) as HTMLElement;
        const cell = this.querySelector(`td[data-r="${row}"][data-c="${col}"]`) as HTMLElement;
        if(!this.grid[row][col].cellActive) {
           this.activeCellElement = cell as HTMLElement;
-          console.log(this.grid[this.previousCell.row][this.previousCell.col], "cell123")
-          console.log((previousCell.computedStyleMap().get("min-width") as CSSUnitValue).value,cell.getBoundingClientRect(),"precell")
-          console.log(this.grid,"setww")
           const currentWidth = previousCell.getBoundingClientRect().width;
           
           this.grid[this.selectedCell.row][this.selectedCell.col].minWidth = currentWidth;
@@ -557,7 +545,6 @@ export class SpreadSheet extends HTMLElement {
     }
 
     handleClick(event: Event):void {
-      console.log(event, 'event');
        const td = (event.target as HTMLElement).closest('td');
        if(td?.children[0]?.nodeName !== 'DIV' && !td?.children[0]?.attributes.getNamedItem('contentEditable') ) return;
        
@@ -568,18 +555,16 @@ export class SpreadSheet extends HTMLElement {
 
     setCellFocus(event: MouseEvent):void {
         const cell = event.target as HTMLElement;
-        console.log(cell.parentElement?.localName,'node name',cell.attributes.getNamedItem('contentEditable'))
         if(!((cell.nodeName === 'DIV') && cell.attributes.getNamedItem('contentEditable'))) return;
         cell.setAttribute("contentEditable", "true");
         cell.style.removeProperty('width');
         this.startTyping = false;
-        
         // cell.classList.remove('normal-cell');
         // cell.classList.add('input-cell', 'editable-cell');
         // cell.style.position = "fixed";
         cell.style.left = `${cell.parentElement?.getBoundingClientRect().left!}px`;
         cell.style.top = `${cell.parentElement?.getBoundingClientRect().top! + 2}px`;
-        // console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth, "cellrow",this.grid)
+        // console.log(this.grid[this.sele      ctedCell.row][this.selectedCell.col].minWidth, "cellrow",this.grid)
         // console.log(this.grid[this.selectedCell.row][this.selectedCell.col].minWidth,"inside width")
         // console.log(this.grid,"gridthis")
         // cell.style.minWidth = `${this.grid[this.selectedCell.row][this.selectedCell.col].minWidth}px`;
@@ -590,6 +575,7 @@ export class SpreadSheet extends HTMLElement {
         range.collapse(false);
         sel?.removeAllRanges();
         sel?.addRange(range);
+        console.log(this.selectedCell,"sle12")
     }
 
     setCellFocusWhileEnterButon(cell: HTMLElement):void {
@@ -630,7 +616,6 @@ export class SpreadSheet extends HTMLElement {
         this.grid[this.selectedCell.row][this.selectedCell.col].startTypingAt = startTypingTime;
       };
       this.grid[this.selectedCell.row][this.selectedCell.col].oldValue = this.grid[this.selectedCell.row][this.selectedCell.col].newValue;
-      console.log(this.grid[this.selectedCell.row][this.selectedCell.col].newValue,this.grid[this.selectedCell.row][this.selectedCell.col].oldValue,"no")
       const currentTime = new Date();
       setTimeout(()=>{
        if(startTypingTime! - currentTime.getMilliseconds() <= 2000) {
@@ -690,6 +675,7 @@ export class SpreadSheet extends HTMLElement {
         // selection?.removeAllRanges();
         // selection?.addRange(range);
       }
+      console.log(this.selectedCell,"sle45")
     }
 
     getAvailableWidth(cell:HTMLDivElement): number {
@@ -749,7 +735,6 @@ getLineWidth(text: string, font: string) {
 }
 
     renderer() {
-        console.log("works2")
          this.innerHTML = `
          <div style="width:max-content;overflow-x:auto;">
            <table id="table-sheet" class="table-sheet">

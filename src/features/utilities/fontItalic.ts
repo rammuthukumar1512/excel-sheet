@@ -8,20 +8,17 @@ export class FontItalic extends HTMLElement {
     
         connectedCallback() {
            this.renderer();
-            const select = this.querySelector("#bold") as HTMLSpanElement;
+           this.spreadSheet = SpreadSheet.instance;
+            const select = this.querySelector("#italic") as HTMLSpanElement;
             select?.addEventListener("click", ()=>{
-              //  this.spreadSheet.setFontItalic();
+              console.log(this.spreadSheet.selectedCell,"sheet")
               this.spreadSheet.applyStyleToSelection("font-style", "italic");
             });
-            setTimeout(()=>{
-              this.spreadSheet = new SpreadSheet();
-            },500);
-            
         };
         
         renderer() {
-            this.innerHTML = `<button id="bold"><i class="fa-solid fa-italic"></i></button>`;
-        }
+            this.innerHTML = `<button id="italic"><i class="fa-solid fa-italic"></i></button>`;
+        };
 }
 
 customElements.define("font-italic", FontItalic);

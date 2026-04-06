@@ -18,7 +18,6 @@ export class UndoRedo extends HTMLElement {
       }
 
       connectedCallback() {
-             console.log("undoredo")
          this.renderer();
       }
 
@@ -30,9 +29,7 @@ export class UndoRedo extends HTMLElement {
       }
 
       saveEdit(currentValue: CellChange) {
-        console.log(currentValue,"cvalue")
         this.undoStack.push(currentValue)
-        console.log(this.undoStack,"undostack")
       }
 
       undo(currentCell: CellChange): CellChange | undefined {
