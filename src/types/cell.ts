@@ -1,5 +1,5 @@
 export type CellValue = string;
-export type Editor = [{text: string, style: object, startOffset: number, endOffset: number}];
+export type Editor = {text: string, style: object, startOffset: number, endOffset: number}[];
 
 export interface Cell {
   value: CellValue;
