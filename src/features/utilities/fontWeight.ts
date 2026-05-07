@@ -11,14 +11,10 @@ fontFamilies = ["Arial", "Roboto", "Times New Roman"];
     connectedCallback() {
        this.renderer();
         const select = this.querySelector("#bold") as HTMLSpanElement;
+        this.spreadSheet = SpreadSheet.instance;
         select?.addEventListener("click", ()=>{
-           this.spreadSheet.setFontWeight();
+           this.spreadSheet.applyStyleToSelection("font-weight", "bold");
         });
-        setTimeout(()=>{
-          this.spreadSheet = new SpreadSheet();
-          //   clearTimeout(timerId);
-        },500);
-        
     };
     
     renderer() {

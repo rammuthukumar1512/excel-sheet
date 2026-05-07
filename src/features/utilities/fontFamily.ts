@@ -9,23 +9,15 @@ export class FontFamily extends HTMLElement {
         super();
     }   
 
-    setSpreadSheet(sheet: SpreadSheet):void {
-        this.spreadSheet = new SpreadSheet;
-    }
-
     connectedCallback() {
        this.renderer();
+        this.spreadSheet = SpreadSheet.instance;
         const select = this.querySelector("#fontFamily") as HTMLSelectElement;
         select?.addEventListener("change", (e: Event)=>{
             const selElement = e.currentTarget as HTMLSelectElement;
             const selectedFont = selElement.options[selElement.selectedIndex].value;
-            this.spreadSheet.setFontFamily(selectedFont);
+            this.spreadSheet.applyStyleToSelection("font-family", selectedFont);
         });
-        setTimeout(()=>{
-          const spreadSheet = new SpreadSheet;
-          this.spreadSheet = spreadSheet;
-        //   clearTimeout(timerId);
-        },500);
         
     };
     
