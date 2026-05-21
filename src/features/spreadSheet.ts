@@ -97,7 +97,7 @@ export class SpreadSheet extends HTMLElement {
         range.insertNode(span);
     }
 
-    styleText(editor: any, completeEditor: Editor, editorText:string) {
+    styleText(selRange:any,editor: any, completeEditor: Editor, editorText:string) {
          let html = "";
          let subStyleText = "";
          console.log(editorText,"tt")
@@ -107,25 +107,55 @@ export class SpreadSheet extends HTMLElement {
              for(let key in value.style) {
                 style += `${key}: ${value.style[key]};`
              };
-             console.log(value.subStyles,"sss")
-            if(value.subStyles.length) {
+             console.log(style,value,"sss1")
+            if(value.subStyles.length == 1) {
+               value.subStyles.forEach((styleItem, index)=> {
+                
+                console.log(Object.entries(styleItem.styles),"ent")
+                let items = {...styleItem.styles,style};
+                Object.entries(items).forEach(([key, val])=> {
+                 subStyles += `${key}: ${val};`;
+                });
+                console.log(subStyles,"styles")
+                  console.log("0")
+                  subStyleText = `<span style="${subStyles}">${editorText.substring(styleItem.startOffset, styleItem.endOffset)}</span>`;      
+                  subStyleText += `<span style="${subStyles}">${editorText.substring(styleItem.endOffset, value.endOffset)}</span>`;    
+                  console.log(subStyleText,"cvc")
+                });
+            } 
+            else if(value.subStyles.length > 1) {
               
             value.subStyles.forEach((styleItem, index)=> {
+                
                 console.log(Object.entries(styleItem.styles),"ent")
                 let items = {...styleItem.styles};
                 Object.entries(items).forEach(([key, value])=> {
-                 subStyles += `${key}: ${value};`;
+                    subStyles += `${key}: ${value};`;
+                    console.log(subStyles,"styles1")
                 });
-                console.log(subStyles,"styles")
+                if(selRange.start == value.startOffset && selRange.end == value.endOffset) {
+                    let styleOne = subStyles.split(";");
+                    let styleTwo = style.split(";");
+                    let filteredStyle = styleTwo.filter(style => !styleOne.includes(style)).join(";");
+                    console.log(styleOne,"styleone",filteredStyle)
+                    subStyles += filteredStyle;
+                    console.log(subStyles,"styles2")
+                }
+                
+                
                 if(index == 0) {
                   console.log("1")
+                  if(value.startOffset !== styleItem.startOffset) {
                   subStyleText = `<span style="${style}">${editorText.substring(value.startOffset, styleItem.startOffset)}</span>`;
                   subStyleText += `<span style="${subStyles}">${editorText.substring(styleItem.startOffset, styleItem.endOffset)}</span>`;
+                  } else {
+                  subStyleText = `<span style="${subStyles}">${editorText.substring(styleItem.startOffset, styleItem.endOffset)}</span>`;
+                  }
                   console.log(subStyleText,"ste")
                 } else if(index == value.subStyles.length - 1) {
                   console.log("3")
                   subStyleText += `<span style="${subStyles}">${editorText.substring(styleItem.startOffset, styleItem.endOffset)}</span>`;
-                  subStyleText += `<span style="${style}">${editorText.substring(styleItem.endOffset, value.endOffset)}</span>`;
+                  if(styleItem.endOffset !== value.endOffset) subStyleText += `<span style="${style}">${editorText.substring(styleItem.endOffset, value.endOffset)}</span>`;
                   console.log(subStyleText,"stext")
                 }
                 else {
@@ -133,7 +163,7 @@ export class SpreadSheet extends HTMLElement {
                   subStyleText += `<span style="${subStyles}">${editorText.substring(styleItem.startOffset, styleItem.endOffset)}</span>`;
                   console.log(subStyleText,"slast")
                 }
-                
+                subStyles = "";
                 console.log(subStyleText,"subtext")
             });
             } else {
@@ -142,10 +172,41 @@ export class SpreadSheet extends HTMLElement {
             }
             
             html += subStyleText;
+            subStyles = "";
          });
          console.log(html,"html")
          editor.innerHTML = html;
     }
+
+    findSubStyles(selRange:any, completeEditor:Editor) {
+      console.log(completeEditor," completeeditr")
+      let styles:any = [];
+      completeEditor.forEach((modal: any, index:number)=>  {
+        console.log(modal,"check123456789")
+        if(selRange.start <= modal.startOffset && selRange.end >= modal.endOffset) {
+          // if(selRange.start == modal.startOffset && selRange.end == modal.endOffset) return;
+          
+           if(modal.subStyles.length) {
+              modal.subStyles.forEach((value:any, index:number) =>{
+                if(index == 0) {
+                  console.log(modal.style,";;;;;;;;;;;;;;")
+                 styles.push({styles: {...modal.style, ...value.styles}, startOffset: modal.startOffset, endOffset: value.endOffset});
+                //  styles.push({styles: {...modal.style,...value.styles}, startOffset: value.startOffset, endOffset: value.endOffset}); 
+                } else if(index == modal.subStyles.length - 1){
+                 styles.push({styles: {...modal.style, ...value.styles}, startOffset: value.startOffset, endOffset: value.endOffset}); 
+                 styles.push({styles: {...modal.style}, startOffset: value.endOffset, endOffset: modal.endOffset}); 
+                } else {
+                 styles.push({styles: {...modal.style, ...value.styles}, startOffset: value.startOffset, endOffset: value.endOffset}); 
+                }
+              });
+           } else {
+                styles.push({styles: {...modal.style}, startOffset: modal.startOffset, endOffset: modal.endOffset});
+           }
+        }
+      });
+      console.log(styles,"newstyles")
+      return styles;  
+    }    
 
     applyStyleToSelection(styleKey: string, styleValue: string):void {
       let textAndStyles: Styles = [];
@@ -190,7 +251,7 @@ export class SpreadSheet extends HTMLElement {
            if(selRange.end !== editorText.length) completeEditor.push({text:editorText.substring(selRange.end, editorText.length), style: {},subStyles:[], startOffset: selRange.end, endOffset: editorText.length});
          }
          console.log(completeEditor,"fe");
-         this.styleText(editor, completeEditor, editorText);
+         this.styleText(selRange,editor, completeEditor, editorText);
          return;
       } 
       if(completeEditor.length > 1) {
@@ -203,6 +264,10 @@ export class SpreadSheet extends HTMLElement {
          let isStyleApplied = false;
          tempEditor.forEach((modal: any, index: number)=>{
              if(isStyleApplied) return;
+             let currentStyle = {...modal.style};
+             if(currentStyle.hasOwnProperty(styleKey)) delete currentStyle[styleKey]
+             else currentStyle = {...currentStyle, [styleKey]: styleValue}
+             console.log(currentStyle,"stylem")
              if(modal.startOffset === selRange.start && modal.endOffset === selRange.end) {
               
               //  Object.keys(modal.style).forEach((key)=>{
@@ -216,23 +281,23 @@ export class SpreadSheet extends HTMLElement {
                   console.log(completeEditor,"testcomp")
                   let newModal = {text: editorText.substring(modal.startOffset, selRange.start),style: {...modal.style},subStyles:[],startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
-                  completeEditor.splice(index + 1, 0, {text:editorText.substring(selRange.start, selRange.end), style: {...modal.style, [styleKey]: styleValue}, subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
+                  completeEditor.splice(index + 1, 0, {text:editorText.substring(selRange.start, selRange.end), style: {...currentStyle}, subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
                   completeEditor.splice(index + 2, 0, {text:editorText.substring(selRange.end, modal.endOffset), style: {...modal.style}, subStyles:[],startOffset: selRange.end, endOffset: modal.endOffset});
                   this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                   isStyleApplied = true;
-                  this.styleText(editor, completeEditor, editorText);
+                  this.styleText(selRange,editor, completeEditor, editorText);
                   console.log(completeEditor,"ab")
                   return;
              }
              if(selRange.start == modal.startOffset && selRange.end < modal.endOffset) {
                   console.log(selRange, "slr")
-                  let newModal = {text: editorText.substring(selRange.start, selRange.end),style: {...modal.style,[styleKey]: styleValue},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end};
+                  let newModal = {text: editorText.substring(selRange.start, selRange.end),style: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end};
                   completeEditor[index] = newModal;
                   completeEditor.splice(index + 1, 0, {text:editorText.substring(selRange.end, modal.endOffset), style: {...modal.style},subStyles:[], startOffset: selRange.end , endOffset: modal.endOffset});
                   this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                   console.log(completeEditor,"ab1");
                   isStyleApplied = true;
-                  this.styleText(editor, completeEditor, editorText);
+                  this.styleText(selRange,editor, completeEditor, editorText);
                   return;
              }
 
@@ -240,8 +305,11 @@ export class SpreadSheet extends HTMLElement {
                   console.log(selRange, "slr")
                   console.log(completeEditor,"bef1")
                   let subStyles = this.findSubStyles(selRange, completeEditor);
+                  subStyles.forEach((substyle:any, index:number)=>{
+                     if(substyle.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
+                  });
                   console.log(subStyles,"subs")
-                  let newModal = {text: editorText.substring(selRange.start, selRange.end),style: {...modal.style, [styleKey]: styleValue},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end};
+                  let newModal = {text: editorText.substring(selRange.start, selRange.end),style: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end};
                   completeEditor[index] = newModal;
                   console.log(completeEditor,"bef")
                   // completeEditor.splice(index + 1, 0, {text:editorText.substring(modal.endOffset, selRange.end), style: {...completeEditor[index + 1].style, [styleKey]: styleValue}, startOffset: modal.endOffset , endOffset: selRange.end});
@@ -262,13 +330,13 @@ export class SpreadSheet extends HTMLElement {
                       console.log(lastModalIndex, "lstind",completeEditor[lastModalIndex + 1]);
                       if(!!completeEditor[index + 1]) {
                         console.log("jj")
-                        completeEditor.splice(lastModalIndex + 1, 1, {text:editorText.substring(selRange.end, completeEditor[index + 1].endOffset), style: {...completeEditor[index + 1].style},subStyles:[], startOffset: selRange.end , endOffset: completeEditor[index + 1].endOffset});
+                        completeEditor.splice(lastModalIndex + 1, 1, {text:editorText.substring(selRange.end, completeEditor[index + 1].endOffset), style: {...completeEditor[index + 1].style},subStyles:[...completeEditor[index + 1].subStyles], startOffset: selRange.end , endOffset: completeEditor[index + 1].endOffset});
                         // if(completeEditor[lastModalIndex].endOffset !== completeEditor[lastModalIndex + 1]?.startOffset) completeEditor.splice(lastModalIndex + 1, 1, {text:editorText.substring(selRange.end, completeEditor[lastModalIndex + 1]?.endOffset), style: {styleKey: styleValue}, startOffset: selRange.end , endOffset: completeEditor[lastModalIndex + 1]?.endOffset});
                         }
                       this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                       console.log(completeEditor,"comb6")
                       isStyleApplied = true;
-                      this.styleText(editor, completeEditor, editorText);
+                      this.styleText(selRange,editor, completeEditor, editorText);
                       return;
                     };
                     if(modal.endOffset === selRange.end) {
@@ -277,17 +345,17 @@ export class SpreadSheet extends HTMLElement {
                       this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                       console.log(completeEditor,"comb");
                       isStyleApplied = true;
-                      this.styleText(editor, completeEditor, editorText);
+                      this.styleText(selRange,editor, completeEditor, editorText);
                       return;
                     };
                     if(modal.endOffset > selRange.end && modal.startOffset > selRange.end) {
                         console.log(modal, "modall")
-                        let newModal = { text: editorText.substring(selRange.end, modal.endOffset),style: {...modal.style},subStyles:[{styles: {}, startOffset: 0, endOffset: editorText.length}],startOffset: selRange.end, endOffset: modal.endOffset };
+                        let newModal = { text: editorText.substring(selRange.end, modal.endOffset),style: {...modal.style},subStyles:[...modal.subStyles],startOffset: selRange.end, endOffset: modal.endOffset };
                         completeEditor.splice(index + 1, lastModalIndex - 1, newModal);
                         this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                         console.log(completeEditor,"comb2")
                         isStyleApplied = true;
-                        this.styleText(editor, completeEditor, editorText);
+                        this.styleText(selRange,editor, completeEditor, editorText);
                         return;
                     }
                   });
@@ -296,22 +364,23 @@ export class SpreadSheet extends HTMLElement {
              }
              if(selRange.start > modal.startOffset && selRange.end == modal.endOffset) {
                   console.log(selRange,modal, index, "slr")
-                  let newModal = {text: editorText.substring(modal.startOffset, selRange.start),style: {...modal.style},subStyles:[{styles: {}, startOffset: 0, endOffset: editorText.length}],startOffset: modal.startOffset, endOffset: selRange.start};
+                  let newModal = {text: editorText.substring(modal.startOffset, selRange.start),style: {...modal.style},subStyles:[...modal.subStyles],startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
-                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),style: {...modal.style, [styleKey]: styleValue},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
+                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),style: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
                   this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                   isStyleApplied = true;
                   console.log(completeEditor,"ab1");
-                  this.styleText(editor, completeEditor, editorText);
+                  this.styleText(selRange,editor, completeEditor, editorText);
                   return;
              }
 
              if(selRange.start > modal.startOffset && selRange.start < modal.endOffset) {
               console.log(modal,"mdl")
               console.log(completeEditor,"llm")
-                  let newModal = {text: editorText.substring(modal.startOffset, selRange.start),style: {...modal.style},subStyles:[],startOffset: modal.startOffset, endOffset: selRange.start};
+                  let newModal = {text: editorText.substring(modal.startOffset, selRange.start),style: {...modal.style},subStyles:[...modal.subStyles],startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
-                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),style: {...modal.style, [styleKey]: styleValue},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
+                  if(!completeEditor[index + 1].style.hasOwnProperty(styleKey)) currentStyle = {...currentStyle, [styleKey]: styleValue};
+                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),style: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
                   let textEditor:Editor = completeEditor.filter((value, index) => {
                     return !(selRange.start < value.startOffset && selRange.end >= value.endOffset)
                   });
@@ -329,26 +398,13 @@ export class SpreadSheet extends HTMLElement {
                   this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                   isStyleApplied = true;
                   console.log(completeEditor,"ab2");
-                  this.styleText(editor, completeEditor, editorText);
+                  this.styleText(selRange,editor, completeEditor, editorText);
                   return;
                   }
              }
          });
       }
     }
-
-    findSubStyles(selRange:any, completeEditor:Editor) {
-      console.log(completeEditor," completeeditr")
-      let styles:any = [];
-      completeEditor.forEach((modal: any, index:number)=>  {
-        if(selRange.start <= modal.startOffset && selRange.end >= modal.endOffset) {
-          styles.push({styles: {...modal.style}, startOffset: modal.startOffset, endOffset: modal.endOffset});
-        }
-      })
-      return styles;  
-    }    
-        
-    
 
     getSelectionRange() {
         const selection = window.getSelection();
