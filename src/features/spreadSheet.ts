@@ -103,22 +103,25 @@ export class SpreadSheet extends HTMLElement {
          console.log(editorText,"tt")
          completeEditor.forEach((value, index)=> {
             let style = "";
+            let styleObj = {};
             let subStyles = "";
              for(let key in value.styles) {
-                style += `${key}: ${value.styles[key]};`
+                style += `${key}: ${value.styles[key]};`;
+                styleObj = {...styleObj,[key]: value.styles[key]};
              };
              console.log(style,value,"sss1")
             if(value.subStyles.length == 1) {
                value.subStyles.forEach((styleItem, index)=> {
                 
                 console.log(Object.entries(styleItem.styles),"ent")
-                let items = {...styleItem.styles,style};
+                let items = {...styleItem.styles,...styleObj};
                 Object.entries(items).forEach(([key, val])=> {
                  subStyles += `${key}: ${val};`;
                 });
                 console.log(subStyles,"styles")
                   console.log("0")
-                  subStyleText = `<span style="${subStyles}">${editorText.substring(styleItem.startOffset, styleItem.endOffset)}</span>`;      
+                  subStyleText = `<span style="${subStyles}">${editorText.substring(value.startOffset, styleItem.startOffset)}</span>`;      
+                  subStyleText += `<span style="${subStyles}">${editorText.substring(styleItem.startOffset, styleItem.endOffset)}</span>`;      
                   subStyleText += `<span style="${subStyles}">${editorText.substring(styleItem.endOffset, value.endOffset)}</span>`;    
                   console.log(subStyleText,"cvc")
                 });
@@ -129,6 +132,7 @@ export class SpreadSheet extends HTMLElement {
                 
                 console.log(Object.entries(styleItem.styles),"ent")
                 let items = {...styleItem.styles};
+                console.log(subStyles)
                 Object.entries(items).forEach(([key, value])=> {
                     subStyles += `${key}: ${value};`;
                     console.log(subStyles,"styles1")
@@ -296,8 +300,8 @@ export class SpreadSheet extends HTMLElement {
          tempEditor.forEach((modal: any, index: number)=>{
              if(isStyleApplied) return;
              let currentStyle = {...modal.styles};
-             if(currentStyle.hasOwnProperty(styleKey)) delete currentStyle[styleKey]
-             else currentStyle = {...currentStyle, [styleKey]: styleValue}
+             if(currentStyle.hasOwnProperty(styleKey)) delete currentStyle[styleKey];
+             else currentStyle = {...currentStyle, [styleKey]: styleValue};
              console.log(currentStyle,"stylem")
              if(Math.abs(selRange.start - selRange.end) == 1 && modal.subStyles.length) {
                 currentStyle = {...modal.subStyles.find((s:any, i:number) => s.startOffset == selRange.start && s.endOffset == selRange.end).styles};
@@ -306,6 +310,10 @@ export class SpreadSheet extends HTMLElement {
                 if(currentStyle.hasOwnProperty(styleKey)) delete currentStyle[styleKey]
                 else currentStyle = {...currentStyle, [styleKey]: styleValue}
              } 
+             let allStylesIsSame = subStyles.every((subst:any, index:number)=>{
+                return JSON.stringify(currentStyle) === JSON.stringify(subst.styles);
+             });
+             console.log(allStylesIsSame,"allstylesame1")
              if(modal.startOffset === selRange.start && modal.endOffset === selRange.end) {
               
               //  Object.keys(modal.style).forEach((key)=>{
@@ -336,6 +344,9 @@ export class SpreadSheet extends HTMLElement {
                   let newModal = {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end};
                   completeEditor[index] = newModal;
                   completeEditor.splice(index + 1, 0, {text:editorText.substring(selRange.end, modal.endOffset), styles: {...modal.styles},subStyles:[...completeEditor[index + 1].subStyles], startOffset: selRange.end , endOffset: modal.endOffset});
+                  if(this.checkAllStylesEmpty(completeEditor)) {
+                    completeEditor = [{text: editorText.substring(0, editorText.length),styles: {},subStyles:[],startOffset: 0, endOffset: editorText.length}];
+                  }
                   this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                   console.log(completeEditor,"ab1");
                   isStyleApplied = true;
@@ -349,6 +360,10 @@ export class SpreadSheet extends HTMLElement {
                   let subStyles = this.findSubStyles(selRange, completeEditor);
                   subStyles?.forEach((substyle:any, index:number)=>{
                      if(substyle.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
+                     if(!Object.keys(substyle.styles).length) substyle.styles = {["font-variant"]: "Arial"} 
+                  });
+                  let allStylesIsSame = subStyles.every((subst:any, index:number)=>{
+                          return JSON.stringify(currentStyle) === JSON.stringify(subst.styles);
                   });
                   if(this.checkAllSubStylesEmpty(subStyles)) {
                     subStyles = [];
@@ -397,6 +412,9 @@ export class SpreadSheet extends HTMLElement {
                     if(modal.endOffset === selRange.end) {
                       console.log(lastModalIndex, "lstind");
                       completeEditor.splice(index + 1, lastModalIndex - 1);
+                      if(this.checkAllStylesEmpty(completeEditor)) {
+                        completeEditor = [{text: editorText.substring(0, editorText.length),styles: {},subStyles:[],startOffset: 0, endOffset: editorText.length}];
+                      }
                       this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                       console.log(completeEditor,"comb");
                       isStyleApplied = true;
@@ -407,6 +425,9 @@ export class SpreadSheet extends HTMLElement {
                         console.log(modal, "modall")
                         let newModal = { text: editorText.substring(selRange.end, modal.endOffset),styles: {...modal.styles},subStyles:[...modal.subStyles],startOffset: selRange.end, endOffset: modal.endOffset };
                         completeEditor.splice(index + 1, lastModalIndex - 1, newModal);
+                        if(this.checkAllStylesEmpty(completeEditor)) {
+                          completeEditor = [{text: editorText.substring(0, editorText.length),styles: {},subStyles:[],startOffset: 0, endOffset: editorText.length}];
+                        }
                         this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                         console.log(completeEditor,"comb2")
                         isStyleApplied = true;
@@ -422,6 +443,9 @@ export class SpreadSheet extends HTMLElement {
                   let newModal = {text: editorText.substring(modal.startOffset, selRange.start),styles: {...modal.styles},subStyles:[...modal.subStyles],startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
                   completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
+                  if(this.checkAllStylesEmpty(completeEditor)) {
+                      completeEditor = [{text: editorText.substring(0, editorText.length),styles: {},subStyles:[],startOffset: 0, endOffset: editorText.length}];
+                  }
                   this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                   isStyleApplied = true;
                   console.log(completeEditor,"ab1");
@@ -432,6 +456,9 @@ export class SpreadSheet extends HTMLElement {
              if(selRange.start > modal.startOffset && selRange.start < modal.endOffset) {
               console.log(modal,"mdl")
               console.log(completeEditor,"llm")
+                  if(allStylesIsSame) {
+                    subStyles = [];
+                  }
                   let newModal = {text: editorText.substring(modal.startOffset, selRange.start),styles: {...modal.styles},subStyles:[...modal.subStyles],startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
                   if(!completeEditor[index + 1].styles.hasOwnProperty(styleKey)) currentStyle = {...currentStyle, [styleKey]: styleValue};
@@ -450,6 +477,9 @@ export class SpreadSheet extends HTMLElement {
                   // completeEditor.splice(index + 1, 1, {text: editorText.substring(selRange.start, selRange.end),style: {...modal.styles},startOffset: selRange.start, endOffset: selRange.end});
                   
                   console.log(completeEditor[index + 2],"comll2")
+                  if(this.checkAllStylesEmpty(completeEditor)) {
+                    completeEditor = [{text: editorText.substring(0, editorText.length),styles: {},subStyles:[],startOffset: 0, endOffset: editorText.length}];
+                  }
                   this.grid[this.selectedCell.row][this.selectedCell.col].editor = [...completeEditor];
                   isStyleApplied = true;
                   console.log(completeEditor,"ab2");
