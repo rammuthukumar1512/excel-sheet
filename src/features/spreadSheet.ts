@@ -193,7 +193,7 @@ export class SpreadSheet extends HTMLElement {
 
     checkAllSubStylesEmpty(styles:Styles) {
        if(!styles.length) return false;
-        return styles.every((mdl:any)=> {
+        return styles.length > 1 && styles.every((mdl:any)=> {
           console.log(mdl.styles,"34")
           return !Object.keys(mdl.styles).length;
         });
@@ -204,14 +204,16 @@ export class SpreadSheet extends HTMLElement {
     findSubStyles(selRange:any, completeEditor:Editor, styleKey: string, styleValue: string) {
       console.log(completeEditor," completeeditr")
       let styles:any = [];
+      let isSubStyleFetched = false;
       completeEditor.forEach((modal: any, index:number)=>  {
-        
+        if(isSubStyleFetched) return;
         if(selRange.start <= modal.startOffset && selRange.end >= modal.endOffset) {
           // if(selRange.start == modal.startOffset && selRange.end == modal.endOffset) return;
           console.log(modal,"check123456789")
            if(modal.subStyles.length) {
               if(selRange.start == modal.startOffset && selRange.end == modal.endOffset) {
                 styles.push(...modal.subStyles);
+                isSubStyleFetched = true;
                 return;
               }
               modal.subStyles.forEach((value:any, index:number) =>{
@@ -234,6 +236,8 @@ export class SpreadSheet extends HTMLElement {
               });
            } else if(modal.startOffset > selRange.start){
                 styles.push({styles: {...modal.styles}, startOffset: modal.startOffset, endOffset: modal.endOffset});
+                isSubStyleFetched = true;
+                return;
            }
         } else if(selRange.start >= modal.startOffset && selRange.end <= modal.endOffset) {
               if(modal.subStyles.length) {
@@ -252,9 +256,15 @@ export class SpreadSheet extends HTMLElement {
               modal.subStyles.forEach((value:any, index:number) => {
                 if(selRange.start <= value.startOffset && value.startOffset < selRange.end) {
                   styles.push(value);
-                }
+              } 
               });
-           } 
+              isSubStyleFetched = true;
+              return;
+              } else {
+                  styles.push({styles: {...modal.styles}, startOffset: modal.startOffset, endOffset: selRange.end});
+                  isSubStyleFetched = true;
+                  return;
+              } 
         }
       });
       // console.log(this.checkAllSubStylesEmpty(styles),"allst")
@@ -302,6 +312,34 @@ export class SpreadSheet extends HTMLElement {
       }
       );
       return a;
+    }
+
+    setCurrentStyles(selRange: any,styles:any, subStylesWithInSelection:Styles, styleKey: string, styleValue: string) {
+      let currentStyle = {...styles};
+      console.log(subStylesWithInSelection,"mmm")
+            //  let isCurrentStyleAppliedToAllSubstyles = modal.subStyles.every((val: any)=> val.styles.hasOwnProperty(styleKey));
+            // let isCurrentStyleIsExistInAllSubstyles = subStyles.every((val: any)=> val.styles.hasOwnProperty(styleKey));
+            //  if(currentStyle.hasOwnProperty(styleKey) && isCurrentStyleIsExistInAllSubstyles) delete currentStyle[styleKey];
+            //  else {currentStyle = {...currentStyle, [styleKey]: styleValue}; subStyles.forEach((val:any) => val.styles = {...val.styles, [styleKey]: styleValue})};
+            let isCurrentStyleIsExistInAllSubstyles = (subStylesWithInSelection.length && subStylesWithInSelection.every((val: any)=> Object.hasOwn(val.styles, styleKey))) || !subStylesWithInSelection.length;
+                  if(currentStyle.hasOwnProperty(styleKey) && isCurrentStyleIsExistInAllSubstyles) delete currentStyle[styleKey]
+                  else {currentStyle = {...currentStyle, [styleKey]: styleValue}; subStylesWithInSelection.forEach(val => val.styles = {...val.styles, [styleKey]: styleValue})}
+             console.log(currentStyle,"stylem")
+             if(selRange.end - selRange.start == 1 && subStylesWithInSelection.length) {
+                currentStyle = {...subStylesWithInSelection.find((s:any, i:number) => s.startOffset == selRange.start && s.endOffset == selRange.end)?.styles};
+                subStylesWithInSelection = [];
+                console.log(currentStyle,"llllmmmm")
+                if(currentStyle.hasOwnProperty(styleKey)) delete currentStyle[styleKey]
+                else currentStyle = {...currentStyle, [styleKey]: styleValue}
+             } 
+             subStylesWithInSelection?.forEach((substyle:any, index:number)=>{
+                    //  if(substyle.styles.hasOwnProperty(styleKey) && !modal.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
+                     if(currentStyle.hasOwnProperty(styleKey) && !substyle.styles.hasOwnProperty(styleKey)) {substyle.styles = {...substyle.styles,[styleKey]:styleValue}}
+                     else if(!currentStyle.hasOwnProperty(styleKey) && isCurrentStyleIsExistInAllSubstyles && substyle.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
+                    //  if(!currentStyle.hasOwnProperty(styleKey) && substyle.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
+                    //  if(!Object.keys(substyle.styles).length) substyle.styles = {["font-variant"]: "Arial"}; 
+                  });
+        return currentStyle;          
     }
 
     applyStyleToSelection(styleKey: string, styleValue: string):void {
@@ -352,6 +390,7 @@ export class SpreadSheet extends HTMLElement {
       } 
       if(completeEditor.length > 1) {
          let subStyles = this.findSubStyles(selRange, completeEditor, styleKey, styleValue);
+         let subStylesWithInSelection = this.findSubStylesWithInSelection(selRange, subStyles, styleKey, styleValue);
          let subStylesCopy = structuredClone(subStyles);
          subStylesCopy.forEach((val:any, index: number)=>{
             if(selRange.start === val.startOffset && selRange.end === val.endOffset) subStyles.splice(index, 1);
@@ -364,28 +403,6 @@ export class SpreadSheet extends HTMLElement {
          let isStyleApplied = false;
          tempEditor.forEach((modal: any, index: number)=>{
              if(isStyleApplied) return;
-             let currentStyle = {...modal.styles};
-             let isCurrentStyleAppliedToAllSubstyles = modal.subStyles.every((val: any)=> val.styles.hasOwnProperty(styleKey));
-             if(currentStyle.hasOwnProperty(styleKey) && isCurrentStyleAppliedToAllSubstyles) delete currentStyle[styleKey];
-             else currentStyle = {...currentStyle, [styleKey]: styleValue};
-             console.log(currentStyle,"stylem")
-             if(Math.abs(selRange.start - selRange.end) == 1 && modal.subStyles.length) {
-                currentStyle = {...modal.subStyles.find((s:any, i:number) => s.startOffset == selRange.start && s.endOffset == selRange.end).styles};
-                subStyles = [];
-                console.log(currentStyle,"llllmmmm")
-                if(currentStyle.hasOwnProperty(styleKey)) delete currentStyle[styleKey]
-                else currentStyle = {...currentStyle, [styleKey]: styleValue}
-             } 
-             subStyles?.forEach((substyle:any, index:number)=>{
-                    //  if(substyle.styles.hasOwnProperty(styleKey) && !modal.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
-                     if(currentStyle.hasOwnProperty(styleKey) && !substyle.styles.hasOwnProperty(styleKey)) {substyle.styles = {...substyle.styles,[styleKey]:styleValue}};
-                    //  if(!currentStyle.hasOwnProperty(styleKey) && substyle.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
-                    //  if(!Object.keys(substyle.styles).length) substyle.styles = {["font-variant"]: "Arial"}; 
-                  });
-             let allStylesIsSame = subStyles.every((subst:any, index:number)=>{
-                return JSON.stringify(currentStyle) === JSON.stringify(subst.styles);
-             });
-             console.log(allStylesIsSame,"allstylesame1")
              if(modal.startOffset === selRange.start && modal.endOffset === selRange.end) {
               
               //  Object.keys(modal.style).forEach((key)=>{
@@ -397,9 +414,10 @@ export class SpreadSheet extends HTMLElement {
              if(selRange.start > modal.startOffset && selRange.end < modal.endOffset) {
                   console.log("hiiit")
                   console.log(completeEditor,"testcomp")
+                  let currentStyle1 = this.setCurrentStyles(selRange, modal.styles,subStylesWithInSelection, styleKey, styleValue);
                   let newModal = {text: editorText.substring(modal.startOffset, selRange.start),styles: {...modal.styles},subStyles:[...subStyles],startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
-                  completeEditor.splice(index + 1, 0, {text:editorText.substring(selRange.start, selRange.end), styles: {...currentStyle}, subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
+                  completeEditor.splice(index + 1, 0, {text:editorText.substring(selRange.start, selRange.end), styles: {...currentStyle1}, subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
                   completeEditor.splice(index + 2, 0, {text:editorText.substring(selRange.end, modal.endOffset), styles: {...modal.styles}, subStyles:[],startOffset: selRange.end, endOffset: modal.endOffset});
                   console.log(this.checkAllStylesEmpty(completeEditor),"restcheck")
                   if(this.checkAllStylesEmpty(completeEditor) && this.checkAllSubstylesIsEmptyWhenAllStylesIsEmpty(completeEditor)) {
@@ -413,7 +431,8 @@ export class SpreadSheet extends HTMLElement {
              }
              if(selRange.start == modal.startOffset && selRange.end < modal.endOffset) {
                   console.log(selRange, "slr")
-                  let newModal = {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end};
+                  let currentStyle2 = this.setCurrentStyles(selRange, modal.styles,subStylesWithInSelection, styleKey, styleValue);
+                  let newModal = {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle2},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end};
                   completeEditor[index] = newModal;
                   let childSubstyles:Styles = [];
                   if(modal.subStyles.length) {
@@ -436,30 +455,29 @@ export class SpreadSheet extends HTMLElement {
              if(selRange.start == modal.startOffset) {
                   console.log(selRange, "slr")
                   console.log(completeEditor,"bef1")
-                  let subStyles = this.findSubStyles(selRange, completeEditor, styleKey, styleValue);
-                  subStyles?.forEach((substyle:any, index:number)=>{
-                     if(substyle.styles.hasOwnProperty(styleKey) && !modal.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
-                     if(currentStyle.hasOwnProperty(styleKey) && !substyle.styles.hasOwnProperty(styleKey)) {substyle.styles = {...substyle.styles,[styleKey]:styleValue}};
-                     if(!currentStyle.hasOwnProperty(styleKey) && substyle.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
-                     if(!Object.keys(substyle.styles).length) substyle.styles = {["font-variant"]: "Arial"}; 
-                  });
-                  let allStylesIsSame = subStyles.every((subst:any, index:number)=>{
-                          return JSON.stringify(currentStyle) === JSON.stringify(subst.styles);
-                  });
+                  let currentStyle3 = this.setCurrentStyles(selRange, modal.styles,subStylesWithInSelection, styleKey, styleValue);
+                  // let subStyles = this.findSubStyles(selRange, completeEditor, styleKey, styleValue);
+                  // subStyles?.forEach((substyle:any, index:number)=>{
+                  //    if(substyle.styles.hasOwnProperty(styleKey) && !modal.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
+                  //    if(currentStyle.hasOwnProperty(styleKey) && !substyle.styles.hasOwnProperty(styleKey)) {substyle.styles = {...substyle.styles,[styleKey]:styleValue}};
+                  //    if(!currentStyle.hasOwnProperty(styleKey) && substyle.styles.hasOwnProperty(styleKey)) delete substyle.styles[styleKey];
+                  //    if(!Object.keys(substyle.styles).length) substyle.styles = {["font-variant"]: "Arial"}; 
+                  // });
                   if(this.checkAllSubStylesEmpty(subStyles)) {
                     subStyles = [];
                   }
                   console.log(subStyles,"subs")
                   if(Math.abs(selRange.start - selRange.end) == 1 && subStyles.length) {
-                    currentStyle = {...modal.subStyles.find((s:any, i:number) => s.startOffset == selRange.start && s.endOffset == selRange.end)?.styles};
+                    currentStyle3 = {...modal.subStyles.find((s:any, i:number) => s.startOffset == selRange.start && s.endOffset == selRange.end)?.styles};
                     subStyles = [];
-                    console.log(currentStyle,"llllmmmm")
-                    if(currentStyle.hasOwnProperty(styleKey)) delete currentStyle[styleKey]
-                    else currentStyle = {...currentStyle, [styleKey]: styleValue}
+                    console.log(currentStyle3,"llllmmmm")
+                    if(currentStyle3.hasOwnProperty(styleKey)) delete currentStyle3[styleKey]
+                    else currentStyle3 = {...currentStyle3, [styleKey]: styleValue}
                   } 
-                  let subStylesWithInSelction = this.findSubStylesWithInSelection(selRange, subStyles, styleKey, styleValue);
-                  console.log(subStylesWithInSelction,"sin")
-                  let newModal = {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle},subStyles:[...subStylesWithInSelction],startOffset: selRange.start, endOffset: selRange.end};
+                  // let subStylesWithInSelection = this.findSubStylesWithInSelection(selRange, subStyles, styleKey, styleValue);
+                  
+                  console.log(subStylesWithInSelection,"sin")
+                  let newModal = {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle3},subStyles:[...subStylesWithInSelection],startOffset: selRange.start, endOffset: selRange.end};
                   completeEditor[index] = newModal;
                   console.log(completeEditor,"bef")
                   // completeEditor.splice(index + 1, 0, {text:editorText.substring(modal.endOffset, selRange.end), styles: {...completeEditor[index + 1].style, [styleKey]: styleValue}, startOffset: modal.endOffset , endOffset: selRange.end});
@@ -525,10 +543,11 @@ export class SpreadSheet extends HTMLElement {
              }
              if(selRange.start > modal.startOffset && selRange.end == modal.endOffset) {
                   console.log(selRange,modal, index, "slr")
+                  let currentStyle4 = this.setCurrentStyles(selRange, modal.styles,subStylesWithInSelection, styleKey, styleValue);
                   let subStylesWithoutSelection = this.findSubStylesWithoutSelection({startOffset:modal.startOffset, endOffset:selRange.start}, modal.subStyles);
                   let newModal = {text: editorText.substring(modal.startOffset, selRange.start),styles: {...modal.styles},subStyles:[...subStylesWithoutSelection],startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
-                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
+                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle4},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
                   if(this.checkAllStylesEmpty(completeEditor) && this.checkAllSubstylesIsEmptyWhenAllStylesIsEmpty(completeEditor)) {
                       completeEditor = [{text: editorText.substring(0, editorText.length),styles: {},subStyles:[],startOffset: 0, endOffset: editorText.length}];
                   }
@@ -542,14 +561,18 @@ export class SpreadSheet extends HTMLElement {
              if(selRange.start > modal.startOffset && selRange.start < modal.endOffset) {
               console.log(modal,"mdl")
               console.log(completeEditor,"llm")
+              let currentStyle5 = this.setCurrentStyles(selRange, modal.styles,subStylesWithInSelection, styleKey, styleValue);
+              let allStylesIsSame = subStyles.every((subst:any, index:number)=>{
+                return JSON.stringify(currentStyle5) === JSON.stringify(subst.styles);
+              });
                   if(allStylesIsSame) {
                     subStyles = [];
                   }
                   let subStylesWithoutSelection = this.findSubStylesWithoutSelection({startOffset:modal.startOffset, endOffset:selRange.start}, modal.subStyles);
                   let newModal = {text: editorText.substring(modal.startOffset, selRange.start),styles: {...modal.styles},subStyles:[...subStylesWithoutSelection],startOffset: modal.startOffset, endOffset: selRange.start};
                   completeEditor[index] = newModal;
-                  if(!completeEditor[index + 1].styles.hasOwnProperty(styleKey)) currentStyle = {...currentStyle, [styleKey]: styleValue};
-                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle},subStyles:[...subStyles],startOffset: selRange.start, endOffset: selRange.end});
+                  if(!completeEditor[index + 1].styles.hasOwnProperty(styleKey)) currentStyle5 = {...currentStyle5, [styleKey]: styleValue};
+                  completeEditor.splice(index + 1, 0, {text: editorText.substring(selRange.start, selRange.end),styles: {...currentStyle5},subStyles:[...subStylesWithInSelection],startOffset: selRange.start, endOffset: selRange.end});
                   let textEditor:Editor = completeEditor.filter((value, index) => {
                     return !(selRange.start < value.startOffset && selRange.end >= value.endOffset)
                   });
