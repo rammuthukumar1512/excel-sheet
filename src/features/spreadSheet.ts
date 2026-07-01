@@ -206,23 +206,21 @@ export class SpreadSheet extends HTMLElement {
       let styles:any = [];
       let isSubStyleFetched = false;
       completeEditor.forEach((modal: any, index:number)=>  {
-        if(isSubStyleFetched) return;
         if(selRange.start <= modal.startOffset && selRange.end >= modal.endOffset) {
           // if(selRange.start == modal.startOffset && selRange.end == modal.endOffset) return;
           console.log(modal,"check123456789")
            if(modal.subStyles.length) {
               if(selRange.start == modal.startOffset && selRange.end == modal.endOffset) {
                 styles.push(...modal.subStyles);
-                isSubStyleFetched = true;
                 return;
               }
               modal.subStyles.forEach((value:any, index:number) =>{
                 if(value.startOffset > selRange.start && index == 0) {
-                  if(selRange.start !== modal.startOffset) styles.push({styles: {...modal.styles}, startOffset: selRange.start, endOffset: modal.startOffset});
+                  if(selRange.start < modal.startOffset) styles.push({styles: {...modal.styles}, startOffset: selRange.start, endOffset: modal.startOffset});
                   if(modal.startOffset < value.startOffset) styles.push({styles: {...modal.styles}, startOffset: modal.startOffset, endOffset: value.startOffset});
                 }
                 styles.push(value);
-                if(index == modal.subStyles.length - 1) styles.push({styles: {...modal.styles}, startOffset: value.endOffset, endOffset: modal.endOffset});
+                if(index == modal.subStyles.length - 1 && value.endOffset < modal.endOffset) styles.push({styles: {...modal.styles}, startOffset: value.endOffset, endOffset: modal.endOffset});
                 // if(index == 0) {
                 //   console.log(modal.styles,";;;;;;;;;;;;;;")
                 //  if(modal.subStyles.length == 1 && value.startOffset > selRange.start) styles.push({styles: {...value.styles}, startOffset: selRange.start, endOffset: modal.startOffset});
@@ -236,7 +234,6 @@ export class SpreadSheet extends HTMLElement {
               });
            } else if(modal.startOffset > selRange.start){
                 styles.push({styles: {...modal.styles}, startOffset: modal.startOffset, endOffset: modal.endOffset});
-                isSubStyleFetched = true;
                 return;
            }
         } else if(selRange.start >= modal.startOffset && selRange.end <= modal.endOffset) {
@@ -255,14 +252,14 @@ export class SpreadSheet extends HTMLElement {
               if(modal.subStyles.length) {
               modal.subStyles.forEach((value:any, index:number) => {
                 if(selRange.start <= value.startOffset && value.startOffset < selRange.end) {
+                  if(styles[styles.length - 1]?.endOffset < value.startOffset) styles.push({styles: {...modal.styles}, startOffset: styles[styles.length - 1].endOffset, endOffset: value.startOffset});
                   styles.push(value);
               } 
               });
-              isSubStyleFetched = true;
+              
               return;
               } else {
-                  styles.push({styles: {...modal.styles}, startOffset: modal.startOffset, endOffset: selRange.end});
-                  isSubStyleFetched = true;
+                  if(modal.startOffset < selRange.end) styles.push({styles: {...modal.styles}, startOffset: modal.startOffset, endOffset: selRange.end});
                   return;
               } 
         }
@@ -305,10 +302,11 @@ export class SpreadSheet extends HTMLElement {
     findSubStylesAfterSelection(range:any, substyles:Styles, styleKey: string, styleValue: string) {
        let a = substyles.filter((val:any, index: number)=> {
         if(range.startOffset >= val.startOffset && range.startOffset <= val.endOffset && range.endOffset >= val.endOffset) {
-          val.startOffset = range.startOffset;
-          if(Object.hasOwn(val.styles, styleKey)) delete val.styles[styleKey];
+          if(range.startOffset < val.endOffset) val.startOffset = range.startOffset;
+          // if(Object.hasOwn(val.styles, styleKey)) delete val.styles[styleKey];
         }
-      return ((range.startOffset <= val.endOffset && range.endOffset >= val.endOffset) || (range.startOffset <= val.startOffset && range.endOffset <= val.endOffset));
+      // return ((range.startOffset <= val.endOffset && range.endOffset >= val.endOffset) || (range.startOffset <= val.startOffset && range.endOffset <= val.endOffset));
+      return range.startOffset <= val.startOffset && range.endOffset >= val.endOffset;
       }
       );
       return a;
@@ -579,7 +577,9 @@ export class SpreadSheet extends HTMLElement {
                   completeEditor = structuredClone(textEditor);
                   if(!!completeEditor[index + 2]) {
                     console.log(completeEditor[index + 2],"//ll");
-                    completeEditor.splice(index + 2, 1, {text: editorText.substring(selRange.end, completeEditor[index + 2].endOffset),styles: {...completeEditor[index + 2].styles},subStyles:[...completeEditor[index + 2].subStyles],startOffset: selRange.end, endOffset: completeEditor[index + 2].endOffset});
+                    let subStylesOfNextModal = structuredClone(completeEditor[index + 2].subStyles);
+                    const subStylesAfterSelection = this.findSubStylesAfterSelection({startOffset: selRange.end, endOffset: completeEditor[index + 2].endOffset}, subStylesOfNextModal, styleKey, styleValue);
+                    completeEditor.splice(index + 2, 1, {text: editorText.substring(selRange.end, completeEditor[index + 2].endOffset),styles: {...completeEditor[index + 2].styles},subStyles:[...subStylesAfterSelection],startOffset: selRange.end, endOffset: completeEditor[index + 2].endOffset});
                   }
                   let newEditor = structuredClone(tempEditor);
                   console.log(completeEditor,"prevch") 
