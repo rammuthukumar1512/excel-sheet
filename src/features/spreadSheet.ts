@@ -287,13 +287,18 @@ export class SpreadSheet extends HTMLElement {
     };
 
     findSubStylesWithInSelection(range: any, substyles:Styles, styleKey: string, styleValue: string) {
-      let subStylesWithInSelction = substyles.map((val:any, index: number)=> {
+      let subStylesWithInSelction:Styles = [];
+      substyles.forEach((val:any, index: number)=> {
         if((range.start <= val.startOffset && range.end <= val.endOffset)) {
           // if(Object.hasOwn(val.styles, styleKey)) delete val.styles[styleKey];
           // else val.styles = {...val.styles, [styleKey]: styleValue};
-          return {...val, endOffset: range.end};
+          subStylesWithInSelction[subStylesWithInSelction.length] = {...val, endOffset: range.end};
+          return;
         }
-        return val;
+        if(index > 0) {
+          if(subStylesWithInSelction[index - 1]?.endOffset !== val.startOffset) return;
+        }
+        subStylesWithInSelction[subStylesWithInSelction.length] = val;
       }
       );
       return subStylesWithInSelction;
